@@ -108,8 +108,3 @@ TEST_F(PitchCorrectorIntegrationTest, StablePitchCallsCorrection)
     // --- 3. ASSERT ---
     EXPECT_TRUE(std::abs(shifter->getPitchShiftRatio() - 1.f) > permitted_error); //on sharp note, correction should be not bypassed
 }
-
-TEST_F(PitchCorrectorIntegrationTest, LivePitchCorrectionBehavior)
-{
-    
-}
