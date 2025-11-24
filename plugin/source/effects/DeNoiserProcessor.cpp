@@ -6,8 +6,7 @@
 DeNoiserProcessor::DeNoiserProcessor() :
     forwardFFT(fftOrder),
     //Adding the below will fix the errors relating to added gain in the denoiser. Going to do fully when unit testing
-    //window(fftSize,juce::dsp::WindowingFunction<float>::hann, false)
-    window(fftSize,juce::dsp::WindowingFunction<float>::hann)
+    window(fftSize,juce::dsp::WindowingFunction<float>::hann, false)
 {
     //Initialize buffers
     inputBuffer.resize(fftSize,0.0f);

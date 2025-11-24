@@ -57,6 +57,15 @@ public:
 
     void resetRowsToNodes(); // force rows to mirror processor/effectNodes for loading presets
 
+    int getNumItems() const { return items.size(); }
+
+	// get item at index
+    DaisyChainItem* getItem(int index) const {
+        if (index < 0 || index >= items.size())
+            return nullptr;
+        return items[index];
+    }
+
 //private:
 	// reorder handler for multi row support
     // kind: -1 vertical insert, -2 right-slot insert (double row)

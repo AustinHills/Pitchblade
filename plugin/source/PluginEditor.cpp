@@ -530,7 +530,8 @@ void AudioPluginAudioProcessorEditor::showSettings() {
     addAndMakeVisible(presetsBackdrop);
     addAndMakeVisible(settingsPanel);
     // lock reordering while Settings is up
-    daisyChain.setReorderLocked(true);
+    if (isShowingSettings)
+        daisyChain.setReorderLocked(true);
 
     resized();
     repaint();
@@ -563,8 +564,10 @@ void AudioPluginAudioProcessorEditor::showPresets() {
 	// hide other panels
     addAndMakeVisible(presetsBackdrop);
     addAndMakeVisible(presetsPanel);
+
 	// lock daisychain during preset operations
-    daisyChain.setReorderLocked(true);
+    if (isShowingPresets)
+        daisyChain.setReorderLocked(true);
 
     resized();
     repaint();

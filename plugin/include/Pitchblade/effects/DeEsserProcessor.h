@@ -24,6 +24,10 @@ private:
     float envelope = 0.0f;
     double sampleRate = 44100.0;
 
+    //For TC-17, I am creating this to act as a bridge across the gap of waveform peaks so that attack and release work as intended
+    //This tracks peaks rather than averages
+    float rippleEnvelope = 0.0f;
+
     //A stereo IIR filter to detect sibilant frequencies in the sidechain
     //Use an array to hold one filter per channel
     std::array<juce::dsp::IIR::Filter<float>, 2> sidechainFilters;

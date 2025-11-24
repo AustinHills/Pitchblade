@@ -1,6 +1,6 @@
 #pragma once
 #include <JuceHeader.h>
-#include "../../third-party/rubberband/include/rubberband/RubberBandStretcher.h"
+#include "rubberband/RubberBandStretcher.h" // TEST BUG FIX: corrected relative path so tests can include RubberBandStretcher
 
 /*
 ==============================================================================
@@ -40,6 +40,8 @@ public:
 
     // For global latency accounting
     int getLatencySamples() const noexcept { return latencySamples; }
+    float getShiftAmount() const noexcept { return shiftAmount; }   // TEST BUG FIX: expose clamped amount for non-invasive testing
+    float getFormantRatio() const noexcept { return formantRatio; } // TEST BUG FIX: expose mapped ratio for non-invasive testing
 
 private:
     using RB = RubberBand::RubberBandStretcher;

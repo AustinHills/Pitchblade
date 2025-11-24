@@ -243,6 +243,8 @@ void AudioPluginAudioProcessor::savePresetToFile(const juce::File& file) {
     juce::XmlElement presetRoot("PitchbladePreset");
     presetRoot.setAttribute("version", 1.0);
 
+    applyPendingLayout();
+
     // save each active node explicitly
     juce::XmlElement* nodes = new juce::XmlElement("EffectNodes");
     for (auto& node : effectNodes) {
@@ -461,7 +463,6 @@ void AudioPluginAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
     formantShifter.prepare (sampleRate, samplesPerBlock, getTotalNumInputChannels()); //huda 
     equalizer.prepare(sampleRate, samplesPerBlock, getTotalNumInputChannels()); //huda
 
-
     std::lock_guard<std::recursive_mutex> lock(audioMutex);
 
 	//effect node building - reyna
@@ -475,11 +476,15 @@ void AudioPluginAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
     effectNodes.push_back(std::make_shared<PitchNode>(*this));
     effectNodes.push_back(std::make_shared<EqualizerNode>(*this));
 
+    //connect chain
 	// set up default chain: Gain > Noise gate > formant > Pitch
-	for (auto& n : effectNodes) if (n) n->clearConnections();   //clear any existing connections
+	for (auto& n : effectNodes) 
+        if (n) n->clearConnections();   //clear any existing connections
+
     for (size_t i = 0; i + 1 < effectNodes.size(); ++i) {
         effectNodes[i]->connectTo(effectNodes[i + 1]);
     }
+
 	activeNodes = std::make_shared<std::vector<std::shared_ptr<EffectNode>>>(effectNodes);  // shared pointer to active nodes for audio thread
     rootNode = effectNodes.front();
 

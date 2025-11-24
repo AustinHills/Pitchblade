@@ -1,6 +1,7 @@
 # Project name for tests
 project(PitchbladeTests)
 
+
 # RubberBand configuration==============================================
 set(RUBBERBAND_DIR ${CMAKE_SOURCE_DIR}/plugin/third-party/rubberband)
 set(RUBBERBAND_INCLUDE_DIR ${RUBBERBAND_DIR}/include/)
@@ -38,10 +39,15 @@ add_executable(runTests
     # test_Visualizers.cpp
     # test_ParameterIntegration.cpp
     test_UI_DaisyChain.cpp
+    test_FormantShifter.cpp
+    test_FormantDetector.cpp
+    test_Equalizer.cpp
     test_Integration_Amplitude.cpp
     test_Integration_Performance.cpp
     test_Integration_PitchCorrector.cpp
-)
+    test_Integration_VisualizerPanel.cpp
+    test_Equalizer.cpp
+ )
 
 # This forces CMake to build the 'Pitchblade' target (and generate JuceHeader.h)
 # *before* it tries to build 'runTests'. This fixes the "JuceHeader.h not found" error.

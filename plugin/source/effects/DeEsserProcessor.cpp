@@ -19,6 +19,10 @@ void DeEsserProcessor::prepare(double sRate, int samplesPerBlock){
     updateAttackAndRelease();
     updateFilter();
 
+    //Reset envelopes
+    envelope = 0.0f;
+    rippleEnvelope = 0.0f;
+
     //Prepare the IIR filters with the process spec
     juce::dsp::ProcessSpec spec;
     spec.sampleRate = sampleRate;
@@ -63,7 +67,8 @@ void DeEsserProcessor::setFrequency(float frequencyInHz){
 
 //Calculates the smoothing coefficients for the envelope
 void DeEsserProcessor::updateAttackAndRelease(){
-    attackCoeff = exp(-1.0f / (0.001f * attackTime * sampleRate + 0.0000001f));
+    //For TC-15 and 17, I updated the attack to be more aggressive
+    attackCoeff = exp(-7.0f / (0.001f * attackTime * sampleRate + 0.0000001f));
     releaseCoeff = exp(-1.0f / (0.001f * releaseTime * sampleRate + 0.0000001f));
 }
 
@@ -75,7 +80,7 @@ void DeEsserProcessor::updateFilter(){
 
     //Assign the new coefficients to both stereo filters
     for(auto& filter : sidechainFilters){
-        filter.coefficients = *coefficients;
+        filter.coefficients = coefficients;
     }
 }
 
@@ -83,6 +88,10 @@ void DeEsserProcessor::updateFilter(){
 void DeEsserProcessor::process(juce::AudioBuffer<float>& buffer){
     const int numSamples = buffer.getNumSamples();
     const int numChannels = buffer.getNumChannels();
+
+    //TC-15 and TC-17
+    //Fixed release coefficient for ripple smoother
+    const float rippleReleaseCoeff = std::exp(-1.0f / (0.001f * 10.0f * sampleRate));
 
     for(int i = 0;i < numSamples; i++){
         //Find loudest sibilant sample across all channels
@@ -106,11 +115,21 @@ void DeEsserProcessor::process(juce::AudioBuffer<float>& buffer){
             monoInputSample /= (float)numChannels;
         }
 
+        //TC-15 and TC-17
+        //Converts the sine wave into a stable peak value
+        if (sidechainSample > rippleEnvelope) {
+            rippleEnvelope = sidechainSample;
+        } else {
+            rippleEnvelope = rippleReleaseCoeff * rippleEnvelope + (1.0f - rippleReleaseCoeff) * sidechainSample;
+        }
+
         //Envelope detection. The envelope tracks the loudness of the sibilance
-        if(sidechainSample > envelope){
-            envelope = attackCoeff * envelope + (1.0f - attackCoeff) * sidechainSample;
+        //TC-15 and TC-17
+        //Changed this from sidechainSample to rippleEnvelope, since it's more stable
+        if(rippleEnvelope > envelope){
+            envelope = attackCoeff * envelope + (1.0f - attackCoeff) * rippleEnvelope;
         }else{
-            envelope = releaseCoeff * envelope + (1.0f - releaseCoeff) * sidechainSample;
+            envelope = releaseCoeff * envelope + (1.0f - releaseCoeff) * rippleEnvelope;
         }
 
         //Gain calculation (identical to compressor)

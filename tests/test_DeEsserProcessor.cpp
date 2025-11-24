@@ -122,7 +122,7 @@ TEST_F(DeEsserProcessorTest, TC_17) {
 
     simulateSineSignal(buffer, 500.0f, 6000.0f, juce::Decibels::decibelsToGain(-40.0f));
 
-    simulateSineSignal(buffer, 60.0f, 6000.0f, juce::Decibels::decibelsToGain(-12.0f));
+    simulateSineSignal(buffer, 50.0f, 6000.0f, juce::Decibels::decibelsToGain(-12.0f));
 
     ASSERT_NEAR(buffer.getMagnitude(0, samplesPerBlock),juce::Decibels::decibelsToGain(-18.0f),0.001f);
 }
@@ -141,7 +141,7 @@ TEST_F(DeEsserProcessorTest, TC_18) {
 
     simulateSineSignal(buffer, 500.0f, 6000.0f, juce::Decibels::decibelsToGain(-12.0f));
 
-    simulateSineSignal(buffer, 60.0f, 6000.0f, juce::Decibels::decibelsToGain(-40.0f));
+    simulateSineSignal(buffer, 50.0f, 6000.0f, juce::Decibels::decibelsToGain(-40.0f));
 
     ASSERT_NEAR(buffer.getMagnitude(0, samplesPerBlock),juce::Decibels::decibelsToGain(-40.0f),0.001f);
 }
