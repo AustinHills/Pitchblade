@@ -31,7 +31,7 @@ protected:
 };
 
 //Test for TC-05
-TEST_F(NoiseGateProcessorTest, TC_05){
+TEST_F(NoiseGateProcessorTest, SignalBelowThreshold){
 
     juce::AudioBuffer<float> buffer(1, 512);
 
@@ -47,7 +47,7 @@ TEST_F(NoiseGateProcessorTest, TC_05){
 }
 
 //Test for TC-06
-TEST_F(NoiseGateProcessorTest, TC_06){
+TEST_F(NoiseGateProcessorTest, SignalAboveThreshold){
 
     juce::AudioBuffer<float> buffer(1, 512);
 
@@ -63,7 +63,7 @@ TEST_F(NoiseGateProcessorTest, TC_06){
 }
 
 //Test for TC-07
-TEST_F(NoiseGateProcessorTest, TC_07){
+TEST_F(NoiseGateProcessorTest, AttackTime){
 
     juce::AudioBuffer<float> buffer(1, 512);
 
@@ -81,7 +81,7 @@ TEST_F(NoiseGateProcessorTest, TC_07){
 }
 
 //Test for TC-08
-TEST_F(NoiseGateProcessorTest, TC_08){
+TEST_F(NoiseGateProcessorTest, ReleaseTime){
 
     juce::AudioBuffer<float> buffer(1, 512);
 

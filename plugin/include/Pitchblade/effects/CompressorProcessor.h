@@ -36,15 +36,9 @@ private:
     //Updates the attack and release coefficients based on user settings and sample rate
     void updateAttackAndRelease();
 
-    //volume meter - reyna
-    float currentAmplitude = 0.0f;  // tracks RMS amplitude 
-
 public:
     //Constructor
     CompressorProcessor();
-
-    //volume meter
-    float getCurrentLevelDb() const;
 
     // Called before processing to prepare the compressor with the current sample rate
     void prepare(const double sRate);

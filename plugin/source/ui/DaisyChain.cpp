@@ -544,6 +544,10 @@ void DaisyChain::setChainControlsEnabled(bool enabled) {
 // lock reordering and drag/drop when viewing settings/presets
 void DaisyChain::setReorderLocked(bool locked) {
     reorderLocked = locked;
+    
+	// store in properties
+    getProperties().set("ReorderLocked", locked);
+
     // disable add/copy/delete
     addButton.setEnabled(!locked);
     duplicateButton.setEnabled(!locked);
@@ -625,9 +629,9 @@ void DaisyChain::showAddMenu() {
             case 2: newNode = std::make_shared<NoiseGateNode>(processorRef); break;
             case 3: newNode = std::make_shared<CompressorNode>(processorRef); break;
             case 4: newNode = std::make_shared<DeEsserNode>(processorRef); break;
-            case 5: newNode = std::make_shared<PitchNode>(processorRef); break;
+            case 5: newNode = std::make_shared<DeNoiserNode>(processorRef); break;
             case 6: newNode = std::make_shared<FormantNode>(processorRef); break;
-            case 7: newNode = std::make_shared<DeNoiserNode>(processorRef); break;
+            case 7: newNode = std::make_shared<PitchNode>(processorRef); break;
             case 8: newNode = std::make_shared<EqualizerNode>(processorRef); break;
             }
 

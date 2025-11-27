@@ -18,6 +18,12 @@ public:
         }
     }
 
+	// singleton instance
+    static TooltipManager& instance() {
+        static TooltipManager tm;
+        return tm;
+    }
+
 	// load tooltips from file 
     void loadTooltipsFromFile(const juce::File& file) {
         tooltips.clear();

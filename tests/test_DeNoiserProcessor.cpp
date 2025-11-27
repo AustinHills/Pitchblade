@@ -69,7 +69,7 @@ protected:
 };
 
 //Test for TC_19
-TEST_F(DeNoiserProcessorTest, TC_19) {
+TEST_F(DeNoiserProcessorTest, LearnAndReduce) {
     juce::AudioBuffer<float> buffer(1, samplesPerBlock);
 
     processor->prepare(sampleRate);
@@ -89,7 +89,7 @@ TEST_F(DeNoiserProcessorTest, TC_19) {
 }
 
 //Test for TC_20
-TEST_F(DeNoiserProcessorTest, TC_20) {
+TEST_F(DeNoiserProcessorTest, ReLearnProfile) {
     juce::AudioBuffer<float> buffer(1, samplesPerBlock);
 
     processor->prepare(sampleRate);

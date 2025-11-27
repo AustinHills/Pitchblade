@@ -30,7 +30,6 @@ void DeNoiserProcessor::prepare(const double sRate){
 
     inputBufferPos = 0;
     outputBufferPos = 0;
-    samplesProcessed = 0;
     noiseProfileSamples = 0;
 
     //Visualizer stuff
@@ -59,20 +58,6 @@ void DeNoiserProcessor::setLearning(bool learning){
                 bin /= (float)noiseProfileSamples;
             }
         }
-
-        //Attempt to make the resulting sound less staticky
-        //Before this, the noise profile has a lot of peaks, but it's a singular number for each bin
-        //Noise, however, goes up and down. I'm thinking that might be the issue? Let's see
-        //Trying to smooth it all out
-        // std::vector<float> profileCopy = noiseProfile;
-
-        // for(int i = 1;i < noiseProfile.size()-1;i++){
-        //     float prevBin = profileCopy[i-1];
-        //     float thisBin = profileCopy[i];
-        //     float nextBin = profileCopy[i+1];
-
-        //     noiseProfile[i] = (prevBin+thisBin+nextBin) / 3;
-        // }
 
         isLearning = false;
     }
@@ -123,15 +108,6 @@ void DeNoiserProcessor::process(juce::AudioBuffer<float>& buffer){
             //Reset the write pointer
             inputBufferPos = overlap;
         }
-
-        //Moved this stuff up because there was choppy audio
-        // //If the output buffer's position is equal to the size of the fft, then do the same as above but for the output, preparing the cleaned audio to be sent out
-        // if(outputBufferPos == fftSize){
-        //     //Shift output buffer
-        //     std::memmove(outputBuffer.data(),outputBuffer.data() + hopSize,overlap * sizeof(float));
-        //     std::fill(outputBuffer.data() + overlap,outputBuffer.data() + fftSize,0.0f);
-        //     outputBufferPos = 0;
-        // }
     }
 }
 

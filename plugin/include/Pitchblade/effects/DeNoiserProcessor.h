@@ -44,7 +44,6 @@ private:
     std::vector<float> noiseProfile;
 
     //Internal counters
-    int samplesProcessed = 0;
     int noiseProfileSamples = 0;
 
     //Main processing for a single frame

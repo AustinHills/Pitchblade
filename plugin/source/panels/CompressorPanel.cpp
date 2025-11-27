@@ -155,7 +155,6 @@ void CompressorPanel::resized() {
     meterArea.removeFromTop(20);         
     meterArea.removeFromBottom(10);
     meterArea.removeFromLeft(20);
-    //volumeMeter.setBounds(meterArea);
     volumeMeter->setBounds(meterArea);
 
     // left column - threshold and release

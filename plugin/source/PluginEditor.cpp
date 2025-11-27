@@ -98,19 +98,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
     }
 
     tooltipManager.initialize( &customLF);     // initialize tooltpwindow using tooltipmanager
-
-    //apply tooltips to every daisychain row
-    auto applyRowTooltips = [this]() {
-            for (int i = 0; i < daisyChain.items.size(); ++i) {
-                if (auto* row = daisyChain.items[i]) {
-					const juce::String effectKey = "effect." + row->getName(); // uses daisyChainItem setName as effect name
-
-                    row->button.setTooltip(tooltipManager.getTooltipFor(effectKey));
-                    row->bypass.setTooltip(tooltipManager.getTooltipFor("bypass"));
-                    row->modeButton.setTooltip(tooltipManager.getTooltipFor("modeButton"));
-                }
-            }
-        };
+    applyRowTooltips(); //apply tooltips to every daisychain row
 
 	// assign tooltips to top bar and global daisychain buttons
     topBar.presetButton.setTooltip(tooltipManager.getTooltipFor("presetButton"));
@@ -120,9 +108,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
     daisyChain.duplicateButton.setTooltip(tooltipManager.getTooltipFor("duplicateButton"));
     daisyChain.deleteButton.setTooltip(tooltipManager.getTooltipFor("deleteButton"));
 
-    applyRowTooltips();
-
-
+  
 	// global bypass button / reyna  ////////////////////////////////////////////
     // Top bar bypass daisychains
     topBar.bypassButton.setClickingTogglesState(false);
@@ -179,7 +165,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
             };
     }
         //keeps daiychain ui reordering consistant with processor ////////////////////////////
-        daisyChain.onReorderFinished = [this, applyRowTooltips]() {
+        daisyChain.onReorderFinished = [this]() {
             // new API for multiple rows - get current UI layout and send it to the processor
             const auto& rows = daisyChain.getCurrentLayout();       // get current layout
             std::vector<AudioPluginAudioProcessor::Row> procRows;   // prepare processing rows
@@ -194,8 +180,6 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
                 if (editor->isPresetsVisible())
                     editor->closeOverlaysIfOpen();
             }
-
-            //processorRef.requestReorder(daisyChain.getCurrentOrder());  // getting current ui order for reorder
 
             visualizer.clearVisualizer();   // safely clear old node references
             // reconnect buttons after reorder
@@ -268,24 +252,6 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
 
             //rebuild ui after preset data is updated
             juce::MessageManager::callAsync([this]() {
-
-                //// pull layout from processor
-                //auto procRows = processorRef.getCurrentLayoutRows();
-                //if (!procRows.empty()) {
-                //    std::vector<DaisyChain::Row> uiRows;
-                //    uiRows.reserve(procRows.size());
-                //    for (const auto& r : procRows) {
-                //        DaisyChain::Row row;
-                //        row.left = r.left;
-                //        row.right = r.right;
-                //        uiRows.push_back(row);
-                //    }
-                //    daisyChain.setRows(uiRows);
-                //} else {
-                //    // when processor has no layout 
-                //    daisyChain.resetRowsToNodes();
-                //}
-                //daisyChain.setReorderLocked(true);
                 // full UI rebuild after preset operation
                 rebuildAndSyncUI();
             
@@ -361,6 +327,7 @@ void AudioPluginAudioProcessorEditor::rebuildAndSyncUI() {
             }
         }
     }
+    applyRowTooltips();
     if (activeEffectName.isNotEmpty())
         setActiveEffectByName(activeEffectName);
 }
@@ -502,6 +469,31 @@ void AudioPluginAudioProcessorEditor::buttonClicked(juce::Button* button){
     return;
 }
 
+// reyna - apply tooltips to every daisychain row
+void AudioPluginAudioProcessorEditor::applyRowTooltips() {
+    for (int i = 0; i < daisyChain.items.size(); ++i) {
+        if (auto* row = daisyChain.items[i]) {
+            // left side effect
+            const juce::String leftKey = "effect." + row->getName();
+            row->button.setTooltip(tooltipManager.getTooltipFor(leftKey));
+
+            auto modeKey = row->modeButton.getProperties().getWithDefault("tooltipKey", juce::String());
+            row->modeButton.setTooltip(tooltipManager.getTooltipFor(modeKey.toString()));
+            row->bypass.setTooltip(tooltipManager.getTooltipFor("bypass"));
+
+            // right side effect if present
+            if (!row->rightEffectName.isEmpty()) {
+                const juce::String rightKey = "effect." + row->rightEffectName;
+                row->rightButton.setTooltip(tooltipManager.getTooltipFor(rightKey));
+
+                auto rightModeKey = row->rightMode.getProperties().getWithDefault("tooltipKey", juce::String());
+                row->rightMode.setTooltip(tooltipManager.getTooltipFor(rightModeKey.toString()));
+                //row->modeButton.setTooltip(tooltipManager.getTooltipFor("modeButton"));
+            }
+        }
+    }
+}
+
 ///////////////////////////////////////////////////top bar functions
 // reyna settings panel functions
 void AudioPluginAudioProcessorEditor::showSettings() {
@@ -575,19 +567,29 @@ void AudioPluginAudioProcessorEditor::showPresets() {
 
 // reyna - close both overlays if any are open
 void AudioPluginAudioProcessorEditor::closeOverlaysIfOpen() {
+    bool closedSomething = false;
+
     if (isShowingSettings) {
         isShowingSettings = false;
         settingsPanel.setVisible(false);
         topBar.setButtonActive(topBar.settingsButton, false);
+        closedSomething = true;
     }
     if (isShowingPresets) {
         isShowingPresets = false;
         presetsPanel.setVisible(false);
         topBar.setButtonActive(topBar.presetButton, false);
+        closedSomething = true;
+    }
+	// if either was open, we close
+    if (closedSomething) {
+        daisyChain.setReorderLocked(false);
+        daisyChain.setChainControlsEnabled(true);
+        daisyChain.repaint();
     }
 
-    daisyChain.setChainControlsEnabled(true);
-    daisyChain.setReorderLocked(false);
+    //daisyChain.setChainControlsEnabled(true);
+    //daisyChain.setReorderLocked(false);
     visualizer.setVisible(true);
     effectPanel.setVisible(true);
 

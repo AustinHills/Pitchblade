@@ -7,7 +7,11 @@ bypassButton	= Toggle all effects on or off
 settingsButton	= Open plugin settings
 
 //indivdual daisy chain buttons
-modeButton	= Change chaining mode
+modeButton	 = Change chaining mode
+mode.down    = Down: Sends audio to the next effect
+mode.split   = Split: Sends audio to two effects at the same time
+mode.double  = Double Down: Runs two effects in parallel
+mode.unite   = Unite: Merges two parallel effects together
 bypass		= Bypass this effect temporarily
 
 // global daisy chain buttons
@@ -23,3 +27,4 @@ effect.Formant		= Shifts vowel/tone characteristics without changing pitch
 effect.Pitch		= Detects pitch to the nearest target note
 effect.De-Esser		= Reduces harsh, high-frequency 's', 'sh', and 't' sounds (sibilance)
 effect.De-Noiser    = Removes background noise
+effect.Equalizer	= Adjusts balance of frequency components

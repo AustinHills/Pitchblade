@@ -98,7 +98,7 @@ protected:
 
 
 //Test for TC-76
-TEST_F(IntegrationAmplitudeTest, TC_76)
+TEST_F(IntegrationAmplitudeTest, GainNode_ApplyPositiveGain)
 {
     auto gainNode = getNodeByType("GainNode");
 
@@ -113,7 +113,7 @@ TEST_F(IntegrationAmplitudeTest, TC_76)
 }
 
 //Test for TC-77
-TEST_F(IntegrationAmplitudeTest, TC_77)
+TEST_F(IntegrationAmplitudeTest, NoiseGateNode_SignalBelowThreshold)
 {
     auto gateNode = getNodeByType("NoiseGateNode");
 
@@ -130,7 +130,7 @@ TEST_F(IntegrationAmplitudeTest, TC_77)
 }
 
 //Test for TC-78
-TEST_F(IntegrationAmplitudeTest, TC_78_NoiseGateNode_AboveThreshold)
+TEST_F(IntegrationAmplitudeTest, NoiseGateNode_SignalAboveThreshold)
 {
     auto gateNode = getNodeByType("NoiseGateNode");
 
@@ -147,7 +147,7 @@ TEST_F(IntegrationAmplitudeTest, TC_78_NoiseGateNode_AboveThreshold)
 }
 
 //Test for TC-79
-TEST_F(IntegrationAmplitudeTest, TC_79_CompressorNode_BelowThreshold)
+TEST_F(IntegrationAmplitudeTest, CompressorNode_SignalBelowThreshold)
 {
     auto compNode = getNodeByType("CompressorNode");
 
@@ -165,7 +165,7 @@ TEST_F(IntegrationAmplitudeTest, TC_79_CompressorNode_BelowThreshold)
 }
 
 //Test for TC-80
-TEST_F(IntegrationAmplitudeTest, TC_80)
+TEST_F(IntegrationAmplitudeTest, CompressorNode_SignalAboveThreshold)
 {
     auto compNode = getNodeByType("CompressorNode");
 
@@ -183,7 +183,7 @@ TEST_F(IntegrationAmplitudeTest, TC_80)
 }
 
 //Test for TC-81
-TEST_F(IntegrationAmplitudeTest, TC_81)
+TEST_F(IntegrationAmplitudeTest, CompressorNode_LimiterMode)
 {
     auto compNode = getNodeByType("CompressorNode");
 
@@ -200,7 +200,7 @@ TEST_F(IntegrationAmplitudeTest, TC_81)
 }
 
 //Test for TC-82
-TEST_F(IntegrationAmplitudeTest, TC_82)
+TEST_F(IntegrationAmplitudeTest, DeEsserNode_SignalInsideFrequencyAndAboveThreshold)
 {
     auto deesserNode = getNodeByType("DeEsserNode");
 
@@ -219,7 +219,7 @@ TEST_F(IntegrationAmplitudeTest, TC_82)
 }
 
 //Test for TC-83
-TEST_F(IntegrationAmplitudeTest, TC_83)
+TEST_F(IntegrationAmplitudeTest, DeEsserNode_SignalOutsideFrequencyAndAboveThreshold)
 {
     auto deesserNode = getNodeByType("DeEsserNode");
 
@@ -238,7 +238,7 @@ TEST_F(IntegrationAmplitudeTest, TC_83)
 }
 
 //Test for TC-84
-TEST_F(IntegrationAmplitudeTest, TC_84)
+TEST_F(IntegrationAmplitudeTest, DeEsserNode_SignalInsideFrequencyAndBelowThreshold)
 {
     auto deesserNode = getNodeByType("DeEsserNode");
 
@@ -257,7 +257,7 @@ TEST_F(IntegrationAmplitudeTest, TC_84)
 }
 
 //Test for TC-85
-TEST_F(IntegrationAmplitudeTest, TC_85)
+TEST_F(IntegrationAmplitudeTest, DeNoiserNode_LearnAndReduce)
 {
     auto denoiserNode = getNodeByType("DeNoiserNode");
 

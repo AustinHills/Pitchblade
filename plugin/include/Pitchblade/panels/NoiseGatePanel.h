@@ -30,11 +30,6 @@ private:
     // Labels
     juce::Label noiseGateLabel, thresholdLabel, attackLabel, releaseLabel;
 
-	//// attachments to link sliders to the apvts parameters
- //   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> thresholdAttachment;
- //   std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attackAttachment;
-	//std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> releaseAttachment;
-
     juce::ValueTree localState;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(NoiseGatePanel)
@@ -59,16 +54,6 @@ public:
 
         // Listen for changes to the threshold
         localState.addListener(this);
-
-        // Start timer
-        int initialIndex = *proc.apvts.getRawParameterValue("GLOBAL_FRAMERATE");
-        switch(initialIndex){
-            case 0: startTimerHz(5); break;
-            case 1: startTimerHz(15); break;
-            case 2: startTimerHz(30); break;
-            case 3: startTimerHz(60); break;
-            default: startTimerHz(30); break;
-        }
     }
 
     ~NoiseGateVisualizer() override;

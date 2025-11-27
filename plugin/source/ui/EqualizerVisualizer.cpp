@@ -42,6 +42,19 @@ void EqualizerVisualizer::resized()
         yLabels->setBounds(getLocalBounds());
 }
 
+void EqualizerVisualizer::forceUpdateForTest()
+{
+    // Keep threshold in sync and rebuild response immediately.
+    graph->setThreshold(processor.getEqualizer().getMidFreq(), -50.0f);
+    updateResponseCurve();
+}
+
+std::vector<juce::Point<float>> EqualizerVisualizer::getLastResponsePoints() const
+{
+    const juce::ScopedLock sl(responseLock);
+    return lastResponse;
+}
+
 void EqualizerVisualizer::timerCallback()
 {
     // Keep the vertical threshold in sync with the mid frequency, baseline at -50 dB (mapped 0 dB)
@@ -109,6 +122,11 @@ void EqualizerVisualizer::updateResponseCurve()
         float displayDb = juce::jmap(db, -24.0f, 24.0f, -100.0f, 0.0f);
 
         points.emplace_back(f, displayDb);
+    }
+
+    {
+        const juce::ScopedLock sl(responseLock);
+        lastResponse = points;
     }
 
     // Push to the graph (thread-safe inside the visualizer)

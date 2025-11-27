@@ -17,16 +17,16 @@ RealTimeGraphVisualizer::RealTimeGraphVisualizer(juce::AudioProcessorValueTreeSt
     int initialIndex = *apvts.getRawParameterValue("GLOBAL_FRAMERATE");
 
     switch(initialIndex){
-        case 0:
+        case 1:
             startTimerHz(5);
             break;
-        case 1:
+        case 2:
             startTimerHz(15);
             break;
-        case 2:
+        case 3:
             startTimerHz(30);
             break;
-        case 3:
+        case 4:
             startTimerHz(60);
             break;
         default:
@@ -52,16 +52,6 @@ void RealTimeGraphVisualizer::paint(juce::Graphics& g){
     //Save current graphics state and clip everything outside of the graph's bounds
     g.saveState();
     g.reduceClipRegion(graphBounds);
-
-    //{   // background gradient - reyna
-    //    juce::ColourGradient grad(
-    //        Colors::accentPink.withAlpha(0.15f), graphBounds.getX(), graphBounds.getY(),
-    //        Colors::accentTeal.withAlpha(0.15f), graphBounds.getX(), graphBounds.getBottom(),
-    //        false
-    //    );
-    //    g.setGradientFill(grad);
-    //    g.fillRect(graphBounds);
-    //}
 
     //Draw graph. Lock the dataMutex to ensure the audio thread doesn't modify the queue while it is being read
     //Curly brackets are used to create a new, inner scope, where objects can be created inside and not exist outside of it
@@ -301,16 +291,16 @@ void RealTimeGraphVisualizer::parameterChanged(const juce::String& parameterID, 
     if(parameterID == "GLOBAL_FRAMERATE"){
         stopTimer();
         switch((int)newValue){
-        case 0:
+        case 1:
             startTimerHz(5);
             break;
-        case 1:
+        case 2:
             startTimerHz(15);
             break;
-        case 2:
+        case 3:
             startTimerHz(30);
             break;
-        case 3:
+        case 4:
             startTimerHz(60);
             break;
         default:

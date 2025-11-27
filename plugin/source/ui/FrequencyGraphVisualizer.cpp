@@ -20,16 +20,16 @@ FrequencyGraphVisualizer::FrequencyGraphVisualizer(juce::AudioProcessorValueTree
     int initialIndex = *apvts.getRawParameterValue("GLOBAL_FRAMERATE");
 
     switch(initialIndex){
-        case 0:
+        case 1:
             startTimerHz(5);
             break;
-        case 1:
+        case 2:
             startTimerHz(15);
             break;
-        case 2:
+        case 3:
             startTimerHz(30);
             break;
-        case 3:
+        case 4:
             startTimerHz(60);
             break;
         default:
@@ -231,19 +231,6 @@ void FrequencyGraphVisualizer::drawSpectrum(juce::Graphics& g){
     g.setColour(Colors::accent);
     juce::Path spectrumPath;
 
-    // Below commented out stuff works. Buuuuuut, it often graphs multiple points on the same x value in pixels
-    // //Get first data point to start the path
-    // const auto& firstPoint = spectrumData[0];
-
-    // //Start path at first data point on the left side of the graph
-    // spectrumPath.startNewSubPath(mapFreqToX(firstPoint.getX()),mapAmpToY(firstPoint.getY()));
-
-    // //Add remaining points to path
-    // for(int i = 1; i < spectrumData.size(); i++){
-    //     const auto& point = spectrumData[i];
-    //     spectrumPath.lineTo(mapFreqToX(point.getX()),mapAmpToY(point.getY()));
-    // }
-
     //No duplicate pixels version. When multiple values want to be on the same x pixel, this averages them out
     int lastXPixel = -1;
     float ySum = 0.0f;
@@ -359,19 +346,6 @@ void FrequencyGraphVisualizer::drawSecondarySpectrum(juce::Graphics& g){
     g.setColour(Colors::accent.withAlpha(0.5f));
     juce::Path spectrumPath;
 
-    // //Get first data point to start the path
-    // const auto& firstPoint = secondarySpectrumData[0];
-
-    // Below commented out stuff works. Buuuuuut, it often graphs multiple points on the same x value in pixels
-    // //Start path at first data point on the left side of the graph
-    // spectrumPath.startNewSubPath(mapFreqToX(firstPoint.getX()),mapAmpToY(firstPoint.getY()));
-
-    // //Add remaining points to path
-    // for(int i = 1; i < secondarySpectrumData.size(); i++){
-    //     const auto& point = secondarySpectrumData[i];
-    //     spectrumPath.lineTo(mapFreqToX(point.getX()),mapAmpToY(point.getY()));
-    // }
-
     //No duplicate pixels version. When multiple values want to be on the same x pixel, this averages them out
     int lastXPixel = -1;
     float ySum = 0.0f;
@@ -469,16 +443,16 @@ void FrequencyGraphVisualizer::parameterChanged(const juce::String& parameterID,
     if(parameterID == "GLOBAL_FRAMERATE"){
         stopTimer();
         switch((int)newValue){
-        case 0:
+        case 1:
             startTimerHz(5);
             break;
-        case 1:
+        case 2:
             startTimerHz(15);
             break;
-        case 2:
+        case 3:
             startTimerHz(30);
             break;
-        case 3:
+        case 4:
             startTimerHz(60);
             break;
         default:

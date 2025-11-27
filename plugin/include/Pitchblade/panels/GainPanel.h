@@ -28,8 +28,6 @@ private:
     juce::Slider gainSlider;
     juce::Label gainLabel;
 
-	// attachment to link slider to the apvts parameters
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> gainAttachment;
 	juce::ValueTree localState; // local state for this panel
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(GainPanel)
@@ -47,17 +45,7 @@ public:
         : RealTimeGraphVisualizer(proc.apvts, "dB", {-100.0f, 0.0f}, false, 6),
           processor(proc),
           gainNode(node)
-    {
-        // Start timer based on global framerate
-        int initialIndex = *proc.apvts.getRawParameterValue("GLOBAL_FRAMERATE");
-        switch(initialIndex){
-            case 0: startTimerHz(5); break;
-            case 1: startTimerHz(15); break;
-            case 2: startTimerHz(30); break;
-            case 3: startTimerHz(60); break;
-            default: startTimerHz(30); break;
-        }
-    }
+    {    }
     ~GainVisualizer() {}
     // Update the graph
     void timerCallback() override;

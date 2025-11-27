@@ -89,7 +89,6 @@ private:
 class CompressorPanel : public juce::Component, public juce::ValueTree::Listener
 {
 public:
-    //explicit CompressorPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& state);
     ~CompressorPanel() override;
 
     void resized() override;
@@ -114,17 +113,9 @@ private:
     juce::Label compressorLabel, thresholdLabel, ratioLabel, attackLabel, releaseLabel;
 
     //volume meter - reyna
-    //juce::Component volumeMeter;
     static void place(juce::Rectangle<int> area, juce::Slider& slider, juce::Label& label, bool useCustomLF);
     std::unique_ptr<SimpleVolumeBar> volumeMeter;
     CompressorNode* node = nullptr;  // store pointer to node instance
-
-    //Attachments to link stuff to APVTS parameters
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> thresholdAttachment;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> ratioAttachment;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attackAttachment;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> releaseAttachment;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> modeAttachment;
 
     juce::ValueTree localState;
 
@@ -159,29 +150,6 @@ public:
 
         //Listen for changes
         localState.addListener(this);
-
-        //Start timer
-        //startTimerHz(30);
-
-        int initialIndex = *proc.apvts.getRawParameterValue("GLOBAL_FRAMERATE");
-
-        switch(initialIndex){
-            case 0:
-                startTimerHz(5);
-                break;
-            case 1:
-                startTimerHz(15);
-                break;
-            case 2:
-                startTimerHz(30);
-                break;
-            case 3:
-                startTimerHz(60);
-                break;
-            default:
-                startTimerHz(30);
-                break;
-        }
     }
 
     ~CompressorVisualizer() override;

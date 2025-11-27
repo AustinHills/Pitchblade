@@ -51,3 +51,5 @@ ipch/
 /.gitignore
 /plugin/x64/Debug
 /plugin/include/Pitchblade/panels/HomePanel.h
+
+/Pitchblade_Installer.exe

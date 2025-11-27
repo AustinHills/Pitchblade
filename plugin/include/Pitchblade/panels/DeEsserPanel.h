@@ -28,13 +28,6 @@ private:
     //Labels
     juce::Label deEsserLabel, thresholdLabel, ratioLabel, attackLabel, releaseLabel, frequencyLabel;
 
-    //Attachments to link stuff to APVTS parameters
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> thresholdAttachment;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> ratioAttachment;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attackAttachment;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> releaseAttachment;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> frequencyAttachment;
-
     juce::ValueTree localState;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(DeEsserPanel)

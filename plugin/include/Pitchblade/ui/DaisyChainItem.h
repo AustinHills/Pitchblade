@@ -49,7 +49,6 @@ public:
 
         // button for chaining mode
         modeButton.setButtonText("M");  
-
         modeButton.setWantsKeyboardFocus(false);
         addAndMakeVisible(modeButton);
 
@@ -144,18 +143,22 @@ public:
     void updateModeVisual() {
         juce::Colour bg;
         juce::String label;
+        juce::String tooltipKey;
+
         switch (chainModeId) {
-            case 1:  bg = Colors::accentTeal;       label = "D"; break;   // down         teal
-            case 2:  bg = Colors::accentPink;       label = "S"; break;   // split        light pink 
-            case 3:  bg = Colors::accentPurple;     label = "DD"; break;  // doubleDown   purple
-            case 4:  bg = Colors::accentBlue;       label = "U"; break;   // unite        blue
-            default: bg = Colors::accent;           label = "M"; break;  
+            case 1:  bg = Colors::accentTeal;       label = "D";         tooltipKey = "mode.down"; break;       // down         teal
+            case 2:  bg = Colors::accentPink;       label = "S";         tooltipKey = "mode.split"; break;      // split        light pink 
+            case 3:  bg = Colors::accentPurple;     label = "DD";        tooltipKey = "mode.double"; break;     // doubleDown   purple
+            case 4:  bg = Colors::accentBlue;       label = "U";         tooltipKey = "mode.unite"; break;      // unite        blue
+            default: bg = Colors::accent;           label = "M";         tooltipKey = "mode.unknown"; break;
         }
         modeButton.setButtonText(label);
         modeButton.setColour(juce::TextButton::buttonColourId, bg);
         modeButton.setColour(juce::TextButton::buttonOnColourId, bg);
         modeButton.setColour(juce::TextButton::textColourOffId, Colors::buttonText);
         modeButton.setColour(juce::TextButton::textColourOnId, Colors::buttonText);
+        modeButton.getProperties().set("tooltipKey", tooltipKey);
+
         modeButton.repaint();
     }
 
@@ -392,6 +395,18 @@ public:
     std::function<void()> onAnyInteraction;   // notify daisychain of interaction
     std::function<bool()> canDrag;            // check if drag allowed
 
+    static juce::String chaingID(int id)
+    {
+        switch (id)
+        {
+        case 1: return "D";   // Down
+        case 2: return "S";   // Split
+        case 3: return "DD";  // Double
+        case 4: return "U";   // Unite
+        default: return "?";
+        }
+    }
+
 private:
     // horizontal layout for normal rows
     static void layoutNormalCell(juce::Rectangle<int> bounds, juce::TextButton& nameBtn, juce::TextButton& modeBadgeBtn, juce::TextButton& bypassBtn)  {
@@ -427,18 +442,5 @@ private:
         bottom.removeFromLeft(gap);
         bypassBtn.setBounds(bottom);
     }
-
-    static juce::String chaingID(int id)
-    {
-        switch (id)
-        {
-        case 1: return "D";   // Down
-        case 2: return "S";   // Split
-        case 3: return "DD";  // Double
-        case 4: return "U";   // Unite
-        default: return "?";
-        }
-    }
-
 };
 

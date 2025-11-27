@@ -33,6 +33,8 @@ public:
     void paint (juce::Graphics&) override;
     void resized() override;
 
+	void applyRowTooltips();    //reyna tooltip helper
+
     //Austin
     void buttonClicked(juce::Button* button) override;
 

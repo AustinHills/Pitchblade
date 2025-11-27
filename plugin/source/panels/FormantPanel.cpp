@@ -3,23 +3,26 @@
 #include "Pitchblade/ui/ColorPalette.h"
 #include "Pitchblade/ui/CustomLookAndFeel.h"
 
-FormantPanel::FormantPanel(AudioPluginAudioProcessor& proc)
-    : processor(proc)
-{
+FormantPanel::FormantPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& state)
+    : processor(proc), localState(state) {
     // Labels + sliders
     //label names for dials - reyna
     formantSlider.setName("Formant");
     mixSlider.setName("Dry/Wet");
 
+	// Listen to local state changes
+    localState.addListener(this);
+
     // Panel title - reyna
     panelTitle.setText("Formant Shifter", juce::dontSendNotification);
-    panelTitle.setName("NodeTitle"); 
+    panelTitle.setName("NodeTitle");
     addAndMakeVisible(panelTitle);
-  
+
     formantLabel.setText("Formant", juce::dontSendNotification);
     addAndMakeVisible(formantLabel);
 
     formantSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+    formantSlider.setRange(-50.0, 50.0, 0.1);
     formantSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 80, 30);
     formantSlider.setRange(-50.0, 50.0, 0.1);
     formantSlider.setSkewFactorFromMidPoint(1.0);
@@ -30,15 +33,39 @@ FormantPanel::FormantPanel(AudioPluginAudioProcessor& proc)
 
     mixSlider.setSliderStyle(juce::Slider::LinearHorizontal);
     mixSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 80, 30);
-    mixSlider.setRange(0.0, 1.0, 0.001);
+    mixSlider.setRange(0.0, 1.0, 0.01);
     addAndMakeVisible(mixSlider);
 
-    // Attachments
-    formantAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processor.apvts, PARAM_FORMANT_SHIFT, formantSlider);
-    mixAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processor.apvts, PARAM_FORMANT_MIX, mixSlider);
+    // Initialize from ValueTree
+    formantSlider.setValue((float)localState.getProperty("FORMANT_SHIFT", 0.0f), juce::dontSendNotification);
+    mixSlider.setValue((float)localState.getProperty("FORMANT_MIX", 1.0f), juce::dontSendNotification);
 
+    // Write back to node state
+    formantSlider.onValueChange = [this]() {
+        localState.setProperty("FORMANT_SHIFT",
+            (float)formantSlider.getValue(), nullptr);
+        };
+
+    mixSlider.onValueChange = [this]() {
+        localState.setProperty("FORMANT_MIX",
+            (float)mixSlider.getValue(), nullptr);
+        };
+}
+
+FormantPanel::~FormantPanel() {
+    if (localState.isValid())
+        localState.removeListener(this);
+}
+
+void FormantPanel::valueTreePropertyChanged(juce::ValueTree& tree, const juce::Identifier& property) {
+    if (tree != localState)
+        return;
+
+    if (property == juce::Identifier("FORMANT_SHIFT")) {
+        formantSlider.setValue( (float)localState.getProperty("FORMANT_SHIFT", formantSlider.getValue()), juce::dontSendNotification);
+    } else if (property == juce::Identifier("FORMANT_MIX")) {
+        mixSlider.setValue( (float)localState.getProperty("FORMANT_MIX", mixSlider.getValue()), juce::dontSendNotification);
+    }
 }
 
 void FormantPanel::resized() {

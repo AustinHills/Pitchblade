@@ -2,7 +2,7 @@
 #include <JuceHeader.h>
 #include "Pitchblade/effects/GainProcessor.h"
 
-TEST(GainProcessorTest, TC_01) 
+TEST(GainProcessorTest, ApplyPositiveGain) 
 {
     // --- 1. ARRANGE ---
     GainProcessor processor;
@@ -24,7 +24,7 @@ TEST(GainProcessorTest, TC_01)
     ASSERT_FLOAT_EQ(buffer.getSample(0, 200), 1.0f);
 }
 
-TEST(GainProcessorTest, TC_02) 
+TEST(GainProcessorTest, ApplyNoGain) 
 {
     // --- ARRANGE ---
     GainProcessor processor;
@@ -43,7 +43,7 @@ TEST(GainProcessorTest, TC_02)
     ASSERT_FLOAT_EQ(buffer.getSample(0, 100), 0.5f);
 }
 
-TEST(GainProcessorTest, TC_03) 
+TEST(GainProcessorTest, ApplyNegativeGain) 
 {
     // --- ARRANGE ---
     GainProcessor processor;
@@ -62,7 +62,7 @@ TEST(GainProcessorTest, TC_03)
     ASSERT_FLOAT_EQ(buffer.getSample(0, 100), 0.25f);
 }
 
-TEST(GainProcessorTest, TC_04) 
+TEST(GainProcessorTest, ApplyNegativeInfinityGain) 
 {
     // --- ARRANGE ---
     GainProcessor processor;

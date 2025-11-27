@@ -58,7 +58,7 @@ protected:
 };
 
 //Test for TC_14
-TEST_F(DeEsserProcessorTest, TC_14) {
+TEST_F(DeEsserProcessorTest, SignalInsideFrequencyAndBelowThreshold) {
     juce::AudioBuffer<float> buffer(1, samplesPerBlock);
 
     processor->prepare(sampleRate, samplesPerBlock);
@@ -75,7 +75,7 @@ TEST_F(DeEsserProcessorTest, TC_14) {
 }
 
 //Test for TC_15
-TEST_F(DeEsserProcessorTest, TC_15) {
+TEST_F(DeEsserProcessorTest, SignalInsideFrequencyAndAboveThreshold) {
     juce::AudioBuffer<float> buffer(1, samplesPerBlock);
 
     processor->prepare(sampleRate, samplesPerBlock);
@@ -92,7 +92,7 @@ TEST_F(DeEsserProcessorTest, TC_15) {
 }
 
 //Test for TC_16
-TEST_F(DeEsserProcessorTest, TC_16) {
+TEST_F(DeEsserProcessorTest, SignalOutsideFrequencyAndAboveThreshold) {
     juce::AudioBuffer<float> buffer(1, samplesPerBlock);
 
     processor->prepare(sampleRate, samplesPerBlock);
@@ -109,7 +109,7 @@ TEST_F(DeEsserProcessorTest, TC_16) {
 }
 
 //Test for TC_17
-TEST_F(DeEsserProcessorTest, TC_17) {
+TEST_F(DeEsserProcessorTest, AttackTime) {
     juce::AudioBuffer<float> buffer(1, samplesPerBlock);
 
     processor->prepare(sampleRate, samplesPerBlock);
@@ -128,7 +128,7 @@ TEST_F(DeEsserProcessorTest, TC_17) {
 }
 
 //Test for TC_18
-TEST_F(DeEsserProcessorTest, TC_18) {
+TEST_F(DeEsserProcessorTest, ReleaseTime) {
     juce::AudioBuffer<float> buffer(1, samplesPerBlock);
 
     processor->prepare(sampleRate, samplesPerBlock);

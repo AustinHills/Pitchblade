@@ -30,7 +30,7 @@ protected:
 };
 
 //Test for TC-09
-TEST_F(CompressorProcessorTest, TC_09) {
+TEST_F(CompressorProcessorTest, SignalBelowThreshold) {
     juce::AudioBuffer<float> buffer(1, 512);
 
     processor->prepare(44100);
@@ -47,7 +47,7 @@ TEST_F(CompressorProcessorTest, TC_09) {
 }
 
 //Test for TC-10
-TEST_F(CompressorProcessorTest, TC_10) {
+TEST_F(CompressorProcessorTest, SignalAboveThreshold) {
     juce::AudioBuffer<float> buffer(1, 512);
     
     processor->prepare(44100);
@@ -63,7 +63,7 @@ TEST_F(CompressorProcessorTest, TC_10) {
 }
 
 //Test for TC-11
-TEST_F(CompressorProcessorTest, TC_11) {
+TEST_F(CompressorProcessorTest, Limiter) {
     juce::AudioBuffer<float> buffer(1, 512);
     
     processor->prepare(44100);
@@ -79,7 +79,7 @@ TEST_F(CompressorProcessorTest, TC_11) {
 }
 
 //Test for TC-012
-TEST_F(CompressorProcessorTest, TC_12){
+TEST_F(CompressorProcessorTest, AttackTime){
 
     juce::AudioBuffer<float> buffer(1, 512);
 
@@ -98,7 +98,7 @@ TEST_F(CompressorProcessorTest, TC_12){
 }
 
 //Test for TC-13
-TEST_F(CompressorProcessorTest, TC_13){
+TEST_F(CompressorProcessorTest, ReleaseTime){
 
     juce::AudioBuffer<float> buffer(1, 512);
 
