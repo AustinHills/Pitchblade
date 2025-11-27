@@ -359,17 +359,26 @@ void PitchDetector::processBlock(const juce::AudioBuffer<float> &buffer)
     return std::sqrt(sumSquares / frame.size());
  }
 
+ /**
+  * @brief Helper function to extract pitch value given ideal lag phase
+  */
  float PitchDetector::convertLagToPitch(float lag)
  {
     if (lag <= 0) return 0.0f;
     return static_cast<float>(sampleRate) / static_cast<float>(lag);
  }
 
+ /**
+  * @brief Getter for pitch
+  */
  float PitchDetector::getCurrentPitch()
  {
     return currentPitch;
  }
 
+ /**
+  * @brief Getter for midi note value, integer
+  */
  float PitchDetector::getCurrentMidiNote()
 {
     if (currentPitch <= 0.f) return 0.f;   
@@ -388,11 +397,18 @@ void PitchDetector::processBlock(const juce::AudioBuffer<float> &buffer)
     return 12 * std::log2(currentPitch / referencePitch);
  }
 
+ /**
+  * @brief Getter for difference between reference pitch and detected pitch.
+  * Use Pitch Corrector's getSemitoneError for difference between detected and target pitch.
+  */
  float PitchDetector::getSemitoneError()
  {
     return getCurrentNote() - getCurrentPitch();
  }
 
+ /**
+  * @brief Getter for name of current note. Assumes reference pitch of 440Hz
+  */
  std::string PitchDetector::getCurrentNoteName()
  {
     int index = (int)(getCurrentNote()) % 12;
