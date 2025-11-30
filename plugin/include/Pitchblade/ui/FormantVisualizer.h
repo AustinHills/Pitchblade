@@ -52,16 +52,11 @@ private:
     private:
         AudioPluginAudioProcessor& proc;
         juce::AudioProcessorValueTreeState& apvtsRef;
-        // Underlying FrequencyGraphVisualizer uses ~20..20000 Hz log scale.
-        const juce::Range<float> baseXAxisHz { 20.0f, 20000.0f };
         // Visible window tailored to detected formants.
         const juce::Range<float> visibleXAxisHz { 300.0f, 5000.0f };
-        float logBaseStart = std::log10(baseXAxisHz.getStart());
-        float logBaseEnd = std::log10(baseXAxisHz.getEnd());
         float logVisibleStart = std::log10(visibleXAxisHz.getStart());
         float logVisibleEnd  = std::log10(visibleXAxisHz.getEnd());
 
-        float mapBaseFreqToX(float freq, juce::Rectangle<int> graph) const;
         float mapVisibleFreqToX(float freq, juce::Rectangle<int> graph) const;
         float mapXToVisibleFreq(float x, juce::Rectangle<int> graph) const;
 

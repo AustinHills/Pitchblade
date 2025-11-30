@@ -16,7 +16,6 @@
 
 class FormantPanel : public juce::Component, public juce::ValueTree::Listener {
 public:
-    explicit FormantPanel(AudioPluginAudioProcessor& proc);
     FormantPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& state);
     ~FormantPanel() override;
 
@@ -32,13 +31,11 @@ public:
 
 private:
     AudioPluginAudioProcessor& processor;
-    juce::Slider gainSlider;
     juce::Label panelTitle;
 
     // --- Formant Shifter controls
     juce::Label  formantLabel, mixLabel;
     juce::Slider formantSlider, mixSlider;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> formantAttach, mixAttach;
 
     // node local state for this panel
     juce::ValueTree localState;

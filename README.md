@@ -8,7 +8,7 @@ The plugin features a dynamic "Daisy Chain" signal flow, allowing users to reord
 
 Pitchblade includes several processing modules tailored for vocals:
 * **Pitch Correction and Shifting:** Real-time pitch detection and correction (powered by RubberBand)
-* **Formant Manipulation:** Formant detection and shifting for altering vocal timbre without affecting pitch.
+* **Formant Manipulation:** Formant detection and shifting for altering vocal timbre without affecting pitch (powered by RubberBand)
 * **Gain:** Increase or decrease volume.
 * **Compressor:** Controls dynamic range, making louder sounds quieter. Also includes a limiter.
 * **Noise Gate:** Eliminates sounds below a certain level.

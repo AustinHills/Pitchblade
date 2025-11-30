@@ -9,7 +9,7 @@
   Detects dominant resonances (formants) in an audio signal in real-time.
   Uses FFT to find spectral peaks and can provide frequencies in Hz.
   
-  Author: Huda
+  Author: Huda Noor
 */
 class FormantDetector
 {
@@ -28,9 +28,6 @@ public:
 
     // Get detected formants in Hertz (frequency)
     std::vector<float> getFormantFrequencies() const;
-
-    // Set the sample rate manually (if needed)
-    void setSampleRate(double sr) { sampleRate = sr; }
 
 private:
     int fftOrder;                 // log2 of FFT size

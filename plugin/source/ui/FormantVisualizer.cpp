@@ -137,15 +137,6 @@ void FormantVisualizer::FormantOverlay::paint(juce::Graphics& g)
     hasLast = true;
 }
 
-float FormantVisualizer::FormantOverlay::mapBaseFreqToX(float freq, juce::Rectangle<int> graph) const
-{
-    auto clamped = juce::jlimit(baseXAxisHz.getStart(), baseXAxisHz.getEnd(), freq);
-    float lf = std::log10(clamped);
-    float proportion = (lf - logBaseStart) / (logBaseEnd - logBaseStart);
-    // Avoid drawing on the exact right edge to prevent clipping
-    return juce::jmap(proportion, (float)graph.getX(), (float)graph.getRight() - 1.0f);
-}
-
 float FormantVisualizer::FormantOverlay::mapVisibleFreqToX(float freq, juce::Rectangle<int> graph) const
 {
     auto clamped = juce::jlimit(visibleXAxisHz.getStart(), visibleXAxisHz.getEnd(), freq);
