@@ -54,3 +54,5 @@ After building, you can run the various test cases included in ./tests/ by runni
 ```bat
 .\configure_windows_test.bat
 ```
+
+For specific instructions on the use of the plugin, please view the User Manual present in "Pitchblade User Manual.pdf".
