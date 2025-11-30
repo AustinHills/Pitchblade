@@ -9,7 +9,7 @@ PitchPanel::PitchPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& state)
             [&](){
                 return std::min(0.f, processor.getPitchCorrector().getSemitoneError());
             },
-            0.f, -100.f, RotationMode::LEFT
+            0.f, -50.f, RotationMode::LEFT
         )
     ),
     rightLevelMeter(
@@ -36,7 +36,6 @@ PitchPanel::PitchPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& state)
     retuneSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
     retuneSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 80, 25);
     retuneSlider.setNumDecimalPlacesToDisplay(1);
-    retuneSlider.setTextValueSuffix(" %");
     addAndMakeVisible(retuneSlider);
 
     retuneLabel.setText("Retune Speed", juce::dontSendNotification);
@@ -56,7 +55,6 @@ PitchPanel::PitchPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& state)
     smoothingSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
     smoothingSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 80, 25);
     smoothingSlider.setNumDecimalPlacesToDisplay(1);
-    smoothingSlider.setTextValueSuffix(" %");
     addAndMakeVisible(smoothingSlider);
 
     smoothingLabel.setText("Correction Ratio", juce::dontSendNotification);
@@ -95,7 +93,8 @@ PitchPanel::PitchPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& state)
     int offsetId = juce::jlimit(1, 12, scaleOffset + 12);
     scaleOffsetBox.setSelectedId(offsetId, juce::dontSendNotification);
         
-    int scaleType = (int)localState.getProperty("PitchType", 0);
+    int scaleType = (int)localState.getProperty("PitchType", static_cast<int>(scaleType::Major) + 1);
+    scaleType = juce::jlimit(1, 2, scaleType); 
     scaleTypeBox.setSelectedId(scaleType, juce::dontSendNotification);
 
     scaleOffsetBox.onChange = [this]() {
@@ -141,7 +140,6 @@ PitchPanel::PitchPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& state)
         };
 
     localState.addListener(this);
-    //startTimerHz(8);    // Update 4x/second  
 }
 
 void PitchPanel::resized()

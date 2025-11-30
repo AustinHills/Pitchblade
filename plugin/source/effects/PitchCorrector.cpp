@@ -130,7 +130,7 @@ float PitchCorrector::applyParameters(float &midi){
  * @param scaleType, 1 is major.
  */
 void PitchCorrector::setScaleType(int scaleType){
-    if(scaleType == 1) this->scaleType = scaleType::Major;
+    if(scaleType == 0) this->scaleType = scaleType::Major;
     else this->scaleType = scaleType::Minor;
 }
 
