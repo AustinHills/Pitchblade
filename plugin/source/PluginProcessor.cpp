@@ -476,9 +476,9 @@ void AudioPluginAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
     effectNodes.push_back(std::make_shared<CompressorNode>(*this));         // so on launch audio isnt as glitchy
     //effectNodes.push_back(std::make_shared<DeEsserNode>(*this));
     //effectNodes.push_back(std::make_shared<DeNoiserNode>(*this));
-    //effectNodes.push_back(std::make_shared<FormantNode>(*this));
+    effectNodes.push_back(std::make_shared<FormantNode>(*this));
     //effectNodes.push_back(std::make_shared<PitchNode>(*this));
-    //effectNodes.push_back(std::make_shared<EqualizerNode>(*this));
+    effectNodes.push_back(std::make_shared<EqualizerNode>(*this));
 
     //connect chain
 	// set up default chain: Gain > Noise gate > formant > Pitch
