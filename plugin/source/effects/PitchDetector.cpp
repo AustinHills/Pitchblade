@@ -113,7 +113,7 @@ void PitchDetector::processBlock(const juce::AudioBuffer<float> &buffer)
             int startIndex = (circularIdx - windowSize + windowSize) % windowSize;
             for (int i = 0; i < windowSize; ++i) {
                 int index = (startIndex + i) % windowSize;
-                circularFrame[i] = circularBuffer[index]; // * windowFunction[i];
+                circularFrame[i] = circularBuffer[index] * windowFunction[i];
             }
 
             // Pass to processor to calculate pYIN
