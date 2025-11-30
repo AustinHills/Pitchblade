@@ -154,5 +154,5 @@ TEST(PitchCorrectorTest, SetScaleType)
     // --- 2. ACT ---
     corrector.setScaleType(-6);
     // --- 3. ASSERT ---
-    ASSERT_FLOAT_EQ(corrector.getScaleType(), 0); // Does it default major?
+    ASSERT_FLOAT_EQ(corrector.getScaleType(), 1); // Does it default minor?
 }

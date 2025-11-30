@@ -69,6 +69,7 @@
         float parabolicMinimum(int);        // Helper function for Viterbi
         std::vector<std::pair<int, float>> findPitchCandidates();
         float processViterbi(std::vector<std::pair<int, float>>&);
+        void prepareFFT(int);               // Helper function for FFT
 
         float currentPitch;                 // Pitch of most recent sample batch in Hz
         double sampleRate;                  // Sample rate
@@ -89,6 +90,10 @@
         float voiceThreshold;                            // Min threshold for a freq to be considered voiced
         std::vector<PitchCandidate> previousCandidates;
         float transitionCost = 15.f;                     // Penalty for changing pitch
+
+        std::unique_ptr<juce::dsp::FFT> forwardFFT;      // Contain FFT info
+        std::vector<float> fftTemp;                      // Temporary buffer for intermediate FFT calculations
+        std::vector<float> cumulativeSquare;             // Buffer to store x^2 operations
 
         std::string noteNames[12] = {
                 "A", "A#", "B", "C", "C#", "D", 
