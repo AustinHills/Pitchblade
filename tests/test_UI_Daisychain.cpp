@@ -190,22 +190,6 @@ TEST(DaisyChainTest, HandleReorderMovesItemToNewRow) {
 }
 
 // TC-27 Reorder Lock Behavior
-// verifies reordering does nothing while locked
-// tests flag enabling and disabling
-//TEST(DaisyChainTest, ReorderLockEnablesAndDisables) {
-//    AudioPluginAudioProcessor proc;
-//    auto& nodes = proc.getEffectNodes();
-//
-//    DaisyChain dc(proc, nodes);
-//
-//    EXPECT_FALSE(dc.isReorderLocked());
-//    dc.setReorderLocked(true);
-//    EXPECT_TRUE(dc.isReorderLocked());
-//    dc.setReorderLocked(false);
-//    EXPECT_FALSE(dc.isReorderLocked());
-//}
-
-// TC-27 Reorder Lock Behavior
 // verifies reordering is blocked when locked
 // tests that order remains unchanged
 TEST(DaisyChainTest, ReorderIsBlockedWhenLocked) {
@@ -491,7 +475,6 @@ TEST(DaisyChainTest, ClosingOverlayUnlocksReorder) {
     EXPECT_NE(unlockedOrder, baseline);
     EXPECT_EQ(unlockedOrder[0], baseline.back());
 }
-
 
 // TC-36 Global Bypass Button Behavior
 TEST(DaisyChainTest, GlobalBypassUpdatesProcessorAndUI) {

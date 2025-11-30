@@ -469,16 +469,16 @@ void AudioPluginAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
     std::lock_guard<std::recursive_mutex> lock(audioMutex);
 
 	//effect node building - reyna
-	// create all default effect nodes and store in effectNodes vector
+	// create all on launch effect nodes and store in effectNodes vector
     effectNodes.clear();
     effectNodes.push_back(std::make_shared<GainNode>(*this));
-    effectNodes.push_back(std::make_shared<NoiseGateNode>(*this));
-    effectNodes.push_back(std::make_shared<CompressorNode>(*this));
-    effectNodes.push_back(std::make_shared<DeEsserNode>(*this));
-    effectNodes.push_back(std::make_shared<DeNoiserNode>(*this));
-    effectNodes.push_back(std::make_shared<FormantNode>(*this));
-    effectNodes.push_back(std::make_shared<PitchNode>(*this));
-    effectNodes.push_back(std::make_shared<EqualizerNode>(*this));
+    //effectNodes.push_back(std::make_shared<NoiseGateNode>(*this));        // commening out some default effects
+    effectNodes.push_back(std::make_shared<CompressorNode>(*this));         // so on launch audio isnt as glitchy
+    //effectNodes.push_back(std::make_shared<DeEsserNode>(*this));
+    //effectNodes.push_back(std::make_shared<DeNoiserNode>(*this));
+    //effectNodes.push_back(std::make_shared<FormantNode>(*this));
+    //effectNodes.push_back(std::make_shared<PitchNode>(*this));
+    //effectNodes.push_back(std::make_shared<EqualizerNode>(*this));
 
     //connect chain
 	// set up default chain: Gain > Noise gate > formant > Pitch
