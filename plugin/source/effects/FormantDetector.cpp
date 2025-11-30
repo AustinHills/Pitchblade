@@ -12,6 +12,7 @@ FormantDetector::FormantDetector(int order)
       window(fftSize, 0.0f),
       fftData(2 * fftSize, 0.0f)
 {
+    // Pre-compute Hann window once to avoid recalculating per block
     // Initialize Hann window: smooths edges to reduce spectral leakage
     for (int i = 0; i < fftSize; ++i)
         window[i] = 0.5f * (1.0f - std::cos(2.0f * juce::MathConstants<float>::pi * i / (fftSize - 1)));
@@ -19,6 +20,7 @@ FormantDetector::FormantDetector(int order)
 
 void FormantDetector::prepare(double sampleRateIn)
 {
+    // Reset state when SR changes so bin->Hz mapping stays valid
     // Prepare internal buffers and set sample rate
     sampleRate = sampleRateIn;
     formants.clear();
@@ -26,6 +28,7 @@ void FormantDetector::prepare(double sampleRateIn)
 
 void FormantDetector::processBlock(const juce::AudioBuffer<float>& buffer)
 {
+    // Gate silence and update formant candidates for the current block
     const int numSamples  = buffer.getNumSamples();
     const int numChannels = buffer.getNumChannels();
 
@@ -62,6 +65,7 @@ void FormantDetector::processBlock(const juce::AudioBuffer<float>& buffer)
 
 void FormantDetector::computeFFT(const juce::AudioBuffer<float>& buffer)
 {
+    // Window and zero-pad before in-place real FFT
     // Copy first channel into fftData with windowing applied
     int numSamples = std::min(buffer.getNumSamples(), fftSize);
     auto* channelData = buffer.getReadPointer(0);
@@ -79,6 +83,7 @@ void FormantDetector::computeFFT(const juce::AudioBuffer<float>& buffer)
 
 void FormantDetector::findFormantPeaks()
 {
+    // Convert FFT bins to magnitudes and pick the strongest vocal-band peaks
     formants.clear();
 
     // Magnitude spectrum
@@ -145,11 +150,13 @@ void FormantDetector::findFormantPeaks()
 
 std::vector<float> FormantDetector::getFormants() const
 {
+    // Return latest detected FFT bins; caller may map to Hz
     return formants;
 }
 
 std::vector<float> FormantDetector::getFormantFrequencies() const
 {
+    // Convert stored bins to Hz based on current sample rate
     std::vector<float> freqs;
     // Convert FFT bin indices to frequency in Hz
     for (auto bin : formants)

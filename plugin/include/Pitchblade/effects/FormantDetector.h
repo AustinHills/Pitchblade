@@ -4,12 +4,13 @@
 #include <JuceHeader.h>
 
 /*
-  FormantDetector class
-  --------------------
+==============================================================================
+  FormantDetector
   Detects dominant resonances (formants) in an audio signal in real-time.
   Uses FFT to find spectral peaks and can provide frequencies in Hz.
   
   Author: Huda Noor
+  ==============================================================================
 */
 class FormantDetector
 {
@@ -20,10 +21,10 @@ public:
     // Prepare the detector for a given sample rate
     void prepare(double sampleRateIn);
 
-    // Process a block of audio and update formants
+    // Analyze one audio block and refresh stored formant peaks
     void processBlock(const juce::AudioBuffer<float>& buffer);
 
-    // Get detected formants as FFT bin indices
+    // Get detected formants as FFT bin indices (empty if none found)
     std::vector<float> getFormants() const;
 
     // Get detected formants in Hertz (frequency)

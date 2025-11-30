@@ -5,7 +5,7 @@
 /*
 ==============================================================================
     FormantShifter – Rubber Band Implementation
-    uses the Rubber Band Library for real-time formant
+    - uses the Rubber Band Library for real-time formant
     shifting while preserving pitch. 
     - Pitch scale is fixed at 1.0 (so that there is no actual pitch change).
     - Formant scale is controlled via setFormantScale(ratio):
