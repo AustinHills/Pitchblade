@@ -1,5 +1,10 @@
 #include "Pitchblade/effects/PitchCorrector.h"
 
+/**
+ * @brief Prepare block to initialize corrector
+ * @param sampleRate A reasonable value is 44100 Hz
+ * @param blockSize The size of the buffer passed to pitch corrector
+ */
 void PitchCorrector::prepare(double sampleRate, int blockSize)
 {
     this->sampleRate = sampleRate;
@@ -19,6 +24,13 @@ void PitchCorrector::prepare(double sampleRate, int blockSize)
     stableCount = 0;
     monoBuffer.setSize(1, blockSize);
 }
+
+/**
+ * @brief Pitch detection handler
+ * @param buffer Raw audio data for pitch correction
+ * @details Call pitch detection, wait for stable pitch to apply correction,
+ * apply parameters, then pass to pitch shifter for processing
+ */
 void PitchCorrector::processBlock(juce::AudioBuffer<float>& buffer){
     // Process pitch detection
     auto numSamples = buffer.getNumSamples();
@@ -81,6 +93,13 @@ void PitchCorrector::processBlock(juce::AudioBuffer<float>& buffer){
     pitchShifter.setPitchShiftRatio(currentRatio);
     pitchShifter.processBlock(buffer);
 }
+
+/**
+ * @brief Helper function for process block
+ * @param midi target midi value after quantizing
+ * @details Apply note transition, retune speed, and waver
+ * to midi value to determine new target midi value
+ */
 float PitchCorrector::applyParameters(float &midi){
 
     // Note Transition: only update if change is above a particular threshold
@@ -106,26 +125,61 @@ float PitchCorrector::applyParameters(float &midi){
     return retunedMidi;
 }
 
+/**
+ * @brief Scale major minor mode setter
+ * @param scaleType, 1 is major.
+ */
 void PitchCorrector::setScaleType(int scaleType){
-    if(scaleType == 1) this->scaleType = scaleType::Minor;
-    else this->scaleType = scaleType::Major;
+    if(scaleType == 0) this->scaleType = scaleType::Major;
+    else this->scaleType = scaleType::Minor;
 }
+
+/**
+ * @brief Key setter. Zero offset is C.
+ * @param scaleOffset from -12 to 0, -1 is B.
+ */
 void PitchCorrector::setScaleOffset(int scaleOffset){
     this->scaleOffset = juce::jlimit(-12, 0, scaleOffset);
 }
+
+/**
+ * @brief Correction ratio setter
+ * @param smoothing value between 0.001f and 1.0f
+ */
 void PitchCorrector::setCorrectionRatio(float smoothing){
     this->smoothing = juce::jlimit(0.001f, 1.0f, smoothing);
 }
+
+/**
+ * @brief Retune speed setter
+ * @param retuneSpeed value between 0.0f and 1.0f
+ */
 void PitchCorrector::setRetuneSpeed(float retuneSpeed){
     this->retuneSpeed = juce::jlimit(0.0f, 1.0f, retuneSpeed);
 }
+
+/**
+ * @brief Note transition setter
+ * @param noteTransition cents value between 0.0f and 50.0f
+ */
 void PitchCorrector::setNoteTransition(float noteTransition){
     this->noteTransition = juce::jlimit(0.0f, 50.0f, noteTransition);
 }
+
+/**
+ * @brief Waver setter
+ * @param waver cents value between 0.0f and 20.0f
+ */
 void PitchCorrector::setWaver(float waver){
     this->waver = juce::jlimit(0.0f, 20.0f, waver);
 }
 
+/**
+ * @brief Snap midi note to ideal midi target note
+ * @param note Detected midi note
+ * @details Compare incoming note to notes in 
+ * set scale and return the closest valid scale note
+ */
 int PitchCorrector::quantizeToScale(int note){
     if (scale.empty()) return note;
 
@@ -146,14 +200,26 @@ int PitchCorrector::quantizeToScale(int note){
     }
     return closestNote;
 }
+
+/**
+ * @brief Helper function to convert midi note to frequency
+ */
 float PitchCorrector::noteToFrequency(float midi){
     return 440.0f * std::pow(2.0f, (midi - 69.f) / 12.0f);
 }
+
+/**
+ * @brief Helper function to convert frequency to midi note
+ */
 float PitchCorrector::frequencyToNote(float freq){
     float midi = 69.0f + 12.0f * std::log2(freq / 440.0f);
     return midi;
 }
 
+/**
+ * @brief Getter for semitone error. 
+ * @returns Clamps to 200 cents up or down.
+ */
 float PitchCorrector::getSemitoneError(){
     float currentPitch = pitchDetector.getCurrentPitch();
     if(currentPitch <= 0.f || targetPitch <= 0.f) return 0.f;
@@ -167,6 +233,10 @@ float PitchCorrector::getSemitoneError(){
     return cents;
 }
 
+/**
+ * @brief Getter for detected note name. 
+ * @returns String value between A and G#
+ */
 std::string PitchCorrector::getCurrentNoteName(){
     float currentPitch = pitchDetector.getCurrentPitch();
     int pitch = frequencyToNote(currentPitch);
@@ -175,6 +245,10 @@ std::string PitchCorrector::getCurrentNoteName(){
     return aNoteNames[index];
 }
 
+/**
+ * @brief Getter for target note name
+ * @returns String value between A and G#
+ */
 std::string PitchCorrector::getTargetNoteName(){
     int pitch = frequencyToNote(targetPitch);
     int index = pitch % 12;
@@ -182,6 +256,9 @@ std::string PitchCorrector::getTargetNoteName(){
     return aNoteNames[index];
 }
 
+/**
+ * @brief Returns unique instance of pitch detector
+ */
 IPitchDetector& PitchCorrector::getDetector() {
     return pitchDetector;  
 }

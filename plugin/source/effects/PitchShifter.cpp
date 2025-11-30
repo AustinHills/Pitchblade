@@ -1,5 +1,8 @@
 #include "Pitchblade/effects/PitchShifter.h"
 
+/**
+ * @brief Prepare block to initialize pitch shifter
+ */
 void PitchShifter::prepare(double sampleRate, int maxBlockSize){
     this->sampleRate = sampleRate;             //parameter: how many samples per cycle. 44100KHz default. Stay by that or 44800 for good results
     this->maxBlockSize = maxBlockSize;         //parameter: max size that will ever be passed to buffer
@@ -12,7 +15,7 @@ void PitchShifter::prepare(double sampleRate, int maxBlockSize){
 
     stretcher = std::make_unique<RubberBand::RubberBandStretcher> (sampleRate, 1, options, 1.0, 1.0);
 
-    bufferSize = 4096; //std::max(maxBlockSize * 8, 4096);
+    bufferSize = 4096;                  // Worth looking for smaller buffers to decrease lag.
     inputBuffer.setSize(1, bufferSize);
     outputBuffer.setSize(1, bufferSize);
 
@@ -20,10 +23,21 @@ void PitchShifter::prepare(double sampleRate, int maxBlockSize){
     pitchRatio.store(1.0f);
 }
 
+/**
+ * @brief Update pitch atomic with new value
+ * @param ratio value from 0.5 to 2.0 
+ */
 void PitchShifter::setPitchShiftRatio(float ratio){
-    ratio = juce::jlimit(0.5f, 2.0f, ratio);    // can move from half to twice
+    ratio = juce::jlimit(0.5f, 2.0f, ratio);    // Can move from half to twice
     pitchRatio.store(ratio);
 }
+
+/**
+ * @brief Handle pitch shifting on an incoming buffer
+ * @param buffer Juce audio buffer holding audio data with effects applied
+ * @details  Accumulate samples to send to processor, process with rubber band,
+ * and send final processed mono data to stereo channels
+ */
 void PitchShifter::processBlock(juce::AudioBuffer<float>& buffer){
     const int numSamples = buffer.getNumSamples();
     const float* input = buffer.getReadPointer(0);
@@ -60,6 +74,13 @@ void PitchShifter::processBlock(juce::AudioBuffer<float>& buffer){
         buffer.copyFrom(channel, 0, buffer, 0, 0, numSamples);
     }
 }
+
+/**
+ * @brief Handle pitch and time details for stretcher
+ * @param required Minimum amount of input data threshold
+ * @details Determine pitch and time ratio information 
+ * and pass that information to pitch and time ratio
+ */
 void PitchShifter::processRubberBand(int required){
     const float* inPtr = inputBuffer.getReadPointer(0);
     float* outPtr = outputBuffer.getWritePointer(0);
@@ -93,6 +114,10 @@ void PitchShifter::processRubberBand(int required){
         writeOut = (writeOut + 1) % bufferSize;
     }
 }
+
+/**
+ * @brief Getter for current amount of samples in buffer
+ */
 int PitchShifter::getAvailableSamples() const{
     return (writeIn - readIn + bufferSize) % bufferSize;
 }

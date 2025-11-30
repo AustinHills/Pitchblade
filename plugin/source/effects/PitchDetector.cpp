@@ -14,64 +14,87 @@
 
  #include "Pitchblade/effects/PitchDetector.h"
 
+ /**
+  * @brief Detailed constructor with custom window size and reference pitch
+  */
  PitchDetector::PitchDetector(int windowSize, float referencePitch):
-    dWindowSize(windowSize),
-    dYinBufferSize(windowSize / 2),
-    dReferencePitch(referencePitch),
-    dVoiceThreshold(0.1f),
-    dMaxCandidates(4),
-    dAmpThreshold(0.001f)
+    windowSize(windowSize),
+    yinBufferSize(windowSize / 2),
+    referencePitch(referencePitch),
+    voiceThreshold(0.1f),
+    ampThreshold(0.001f)
  {
-    // Constructor
+
  }
 
- // Defaults reference pitch to 440Hz, standard A
+  /**
+  * @brief Constructor with custom window size
+  * @details Defaults reference pitch to 440 Hz, standard A4 in concert pitch.
+  */
  PitchDetector::PitchDetector(int windowSize) : PitchDetector(windowSize, 440) {
 
  }
 
- // Defaults Hann window size to 1024. Higher values increase resolution, lower values increase speed.
+  /**
+  * @brief Default constructor
+  * @details
+  * Defaults reference pitch to 440 Hz, standard A4 in concert pitch. 
+  * Defaults window size to 1024. Higher values increase resolution, lower values increase speed.
+  */
  PitchDetector::PitchDetector() : PitchDetector(1024, 440) {
 
  }
 
+ /**
+  * @brief Default destructor
+  */
  PitchDetector::~PitchDetector()
  {
-    // Destructor
+
  }
  
+ /**
+  * @brief Prepare block to initialize detector
+  */
  void PitchDetector::prepare(double sampleRate, int samplesPerBlock, double hopSizeDenominator = 4)
  {
     this->sampleRate = sampleRate;
-    frame.assign(dWindowSize, 0.0f);
-    r.assign(dYinBufferSize + 1, 0.0f);
+    circularFrame.assign(windowSize, 0.0f);
+    r.assign(yinBufferSize + 1, 0.0f);
 
     // Initialize circular buffer of size windowSize with empty floats
-    for(int i = 0; i < dWindowSize; ++i)
-        dCircularBuffer.push_back(0.0f);
-    dCircularIdx = 0;
+    for(int i = 0; i < windowSize; ++i)
+        circularBuffer.push_back(0.0f);
+    circularIdx = 0;
+    
+    // Initialize YIN buffer with all zeroes
+    for(int i = 0; i < yinBufferSize; ++i)
+        yinBuffer.push_back(0.0f);
 
     // Set hop size to fraction of window size. Set higher for more resolution, lower for better CPU
-    dHopSize = dWindowSize / hopSizeDenominator;
-    dSamplesUntilHop = dHopSize; // Initialize counter
+    hopSize = windowSize / hopSizeDenominator;
+    samplesUntilHop = hopSize;                    // Initialize hops to start at highest and count down
 
-    // Initialize yin buffer
-    for(int i = 0; i < dYinBufferSize; ++i)
-        dYinBuffer.push_back(0.0f);
-
-    // Define Hann window
-    for(int i = 0; i < dWindowSize; ++i)
-        dWindowFunction.push_back(0.0f);
+    // Initialize Hann window
+    for(int i = 0; i < windowSize; ++i)
+        windowFunction.push_back(0.0f);
         
-    for (int i = 0; i < dWindowSize; ++i) {
-        dWindowFunction[i] = 0.5f * (1.0f - std::cos(2.0f * juce::MathConstants<float>::pi * i / (dWindowSize - 1)));
+    // Define Hann window
+    for (int i = 0; i < windowSize; ++i) {
+        windowFunction[i] = 0.5f * (1.0f - std::cos(2.0f * juce::MathConstants<float>::pi * i / (windowSize - 1)));
     }
 
+    // Clear last group of pitch candidates, room for new ones
     pitchCandidates.clear();
-    pitchProbabilities.clear();
-    smoothedPitchTrack.clear();
  }
 
+/**
+ * @brief Handle pitch detection on incoming buffer
+ * @param buffer The juce AudioBuffer that holds raw time domain audio data
+ * @details Accumulates samples in internal circular buffer.
+ * Passes these samples to frame processor to run YIN calculations
+ * when the buffer is full with new data
+ */
 void PitchDetector::processBlock(const juce::AudioBuffer<float> &buffer)
  {
     // Set info pointers
@@ -80,52 +103,63 @@ void PitchDetector::processBlock(const juce::AudioBuffer<float> &buffer)
 
     // Accumulate incoming samples in circular buffer
     for(int i = 0; i < bufferNumSamples; ++i){
-        dCircularBuffer[dCircularIdx] = bufferData[i];
-        dCircularIdx = (dCircularIdx + 1) % dWindowSize;
+        circularBuffer[circularIdx] = bufferData[i];
+        circularIdx = (circularIdx + 1) % windowSize;
 
-        dSamplesUntilHop--; // Decrement hop counter
+        samplesUntilHop--; // Decrement hop counter
 
-        if(dSamplesUntilHop <= 0){
+        if(samplesUntilHop <= 0){
             // Handle wrap-around and apply windowing function
-            int startIndex = (dCircularIdx - dWindowSize + dWindowSize) % dWindowSize;
-            for (int i = 0; i < dWindowSize; ++i) {
-                int index = (startIndex + i) % dWindowSize;
-                frame[i] = dCircularBuffer[index] * dWindowFunction[i];
+            int startIndex = (circularIdx - windowSize + windowSize) % windowSize;
+            for (int i = 0; i < windowSize; ++i) {
+                int index = (startIndex + i) % windowSize;
+                circularFrame[i] = circularBuffer[index]; // * windowFunction[i];
             }
 
             // Pass to processor to calculate pYIN
-            processFrame(frame);
+            processFrame(circularFrame);
 
-            dSamplesUntilHop += dHopSize; // Reset counter
+            // Reset counter
+            samplesUntilHop += hopSize; 
         }
     }
 
  }
 
+ /**
+  * @brief Helper to handle pitch detection on individual frame
+  * @param frame Individual frame of raw audio data with windowing function applied
+  * @details Applies difference and cumulative, finds pitch candidates and applies
+  * Viterbi algorithm to determine most likely pitch.
+  */
  void PitchDetector::processFrame(const std::vector<float>& frame)
  {
-    dCurrentAmp = calculateRMS(frame);  // Check if amp is below threshold
-    if(dCurrentAmp < dAmpThreshold){
+    currentAmp = calculateRMS(frame);  // Check if amp is below threshold
+    if(currentAmp < ampThreshold){
         currentPitch = 0.0f;           // Set pitch to 0
         previousCandidates.clear();    // Reset Viterbi
         return;
     }
 
-    difference(frame);      // Populate dYinBuffer with difference function
-    cumulative();           // Apply cumulative mean to dYinBuffer
-
-    auto candidates = findPitchCandidates();
-    //std::vector<float> probabilities = calculateProbabilities(candidates);
-    //currentPitch = temporalTracking(candidates, probabilities);
-
-    currentPitch = processViterbi(candidates);
+    // Processing steps
+    difference(frame);                          // Populate yinBuffer with difference function
+    cumulative();                               // Apply cumulative mean to yinBuffer
+    auto candidates = findPitchCandidates();    // Populate array with possible candidates for real pitch
+    currentPitch = processViterbi(candidates);  // Determine most likely pitch
  }
 
+ /**
+  * @brief Apply difference function from YIN algorithm
+  * @param frame Individual frame of raw audio data with windowing function applied
+  * @details O(N^2) loop to determine difference in time domain. 
+  * Overlaps frequency with itself to find lowest possible difference between the same points
+  * This should return the ideal waveform change
+  */
  void PitchDetector::difference(const std::vector<float>& frame)
  {
     // ACF at lag 0
     float sumSquares = 0.0f;
-    for(int i = 0; i < dWindowSize; ++i){
+    for(int i = 0; i < windowSize; ++i){
         sumSquares += frame[i] * frame[i];  //from ACF = sum_{j=t+1}^{t+W}(x_j*x_{j+\tau})
     }
 
@@ -133,10 +167,10 @@ void PitchDetector::processBlock(const juce::AudioBuffer<float> &buffer)
     r[0] = sumSquares;
 
     // from DF(tau) = r_{\tau}(0) + r_{t + \tau}(0) - 2r_t(\tau)
-    for(int tau = 1; tau < dYinBufferSize; ++tau){
+    for(int tau = 1; tau < yinBufferSize; ++tau){
         // Calculate ACF sum for this lag
         float acf = 0.0f;
-        for(int j = 0; j < dWindowSize - tau; ++j){
+        for(int j = 0; j < windowSize - tau; ++j){
             acf += frame[j] * frame[j + tau]; //from ACF = sum_{j=t+1}^{t+W}(x_j*x_{j+\tau})
         }
 
@@ -145,92 +179,69 @@ void PitchDetector::processBlock(const juce::AudioBuffer<float> &buffer)
                 - (frame[tau - 1] * frame[tau - 1]);
 
         // DF
-        dYinBuffer[tau] = r[0] + r[tau] - 2 * acf;
+        yinBuffer[tau] = r[0] + r[tau] - 2 * acf;
     }
-    dYinBuffer[0] = 1.0f; // Avoid div by 0
+    yinBuffer[0] = 1.0f; // Avoid div by 0
  }
 
+ /**
+  * @brief Apply normalization function from YIN algorithm
+  * @details Cumulative mean normalization applied to YIN buffer.
+  * Divide value by YIN sum, or clamp to reasonable value.
+  */
  void PitchDetector::cumulative()
  {   
     // Running sum
     float r = 0;
-    dYinBuffer[0] = 1.0f; // Special case
+    yinBuffer[0] = 1.0f; // Special case
     
     // Cumulative mean normalization
-    for (int tau = 1; tau < dYinBufferSize; ++tau) {
-        r += dYinBuffer[tau];
+    for (int tau = 1; tau < yinBufferSize; ++tau) {
+        r += yinBuffer[tau];
         if (r <= 0.0f)
         {
-            dYinBuffer[tau] = 1;
+            yinBuffer[tau] = 1;
         } else {
-            dYinBuffer[tau] *= tau / r;
+            yinBuffer[tau] *= tau / r;
         }
     }  
  }
 
- int PitchDetector::absoluteThreshold()
- {
-    const float thresh = 0.15f;
-    int tau = 2;
-    int minTau = -1;
-    float minVal = std::numeric_limits<float>::max(); // Initialize min to max float
-    
-    while (tau < dYinBufferSize)
-    {
-        if (dYinBuffer[tau] < thresh)
-        {
-            // Find smallest period tau for which d' has local minimum
-            while (tau + 1 < dYinBufferSize && dYinBuffer[tau + 1] < dYinBuffer[tau])
-            {
-                ++tau;
-            }
-            return convertLagToPitch(static_cast<int>(tau));
-        } 
-        else 
-        {
-            // Fallback: global min
-            if (dYinBuffer[tau] < minVal)
-            {
-                minVal = dYinBuffer[tau];
-                minTau = tau;
-            }
-        }
-        ++tau;
-    }
-    
-    // No good pitch found
-    if (minTau > 0)
-        return convertLagToPitch(static_cast<int>(minTau));
-    
-    return 0.0f; // No pitch found
- }
-
- // Estimate optimization curve using parabolic interpretation for sample accuracy
+ /**
+  * @brief Estimate optimization curve using parabolic interpretation for sample accuracy
+  * @param tau X value of the time x amplitude vector, index of YIN buffer.
+  * @details Helper function for Viterbi algorithm. Optimizes and approximates actual minimum.
+  */
  float PitchDetector::parabolicMinimum(int tau)
  {
-    if(tau <= 0 || tau >= dYinBufferSize+1) return (float)tau;
+    if(tau <= 0 || tau >= yinBufferSize+1) return (float)tau;
 
-    float x = (float) tau;  //for x = tau find nearest y to left and right
-    float y1 = dYinBuffer[tau - 1];
-    float y2 = dYinBuffer[tau];
-    float y3 = dYinBuffer[tau + 1];
+    float x = (float) tau;  // for x = tau find nearest y to left and right
+    float y1 = yinBuffer[tau - 1];
+    float y2 = yinBuffer[tau];
+    float y3 = yinBuffer[tau + 1];
 
     float denominator = 2 * (2* y2-y1-y3);
-    if(std::abs(denominator) < 0.0001) return x;
+    if(std::abs(denominator) < 0.0001) return x;    // Avoid div by 0
 
     float delta = (y3 - y1) / denominator;
     return x + delta;
  }
 
+ /**
+  * @brief Fill pitch candidates vector with ideal candidates
+  * @details Populate vector with any local minima below threshold
+  * Or use global minimum if there is no local minimum
+  */
  std::vector<std::pair<int, float>> PitchDetector::findPitchCandidates()
  {
     std::vector<std::pair<int, float>> pitchCandidates;
     
     // Find all local minima below threshold
-    for(int tau = 2; tau < dYinBufferSize-1; ++tau){
+    for(int tau = 2; tau < yinBufferSize-1; ++tau){
         // If it is a local minimum, it is a candidate
-        if(dYinBuffer[tau] < dYinBuffer[tau-1] && dYinBuffer[tau] < dYinBuffer[tau+1]){
-            pitchCandidates.emplace_back(tau, dYinBuffer[tau]);
+        if(yinBuffer[tau] < yinBuffer[tau-1] && yinBuffer[tau] < yinBuffer[tau+1]){
+            pitchCandidates.emplace_back(tau, yinBuffer[tau]);
         }
     }
 
@@ -238,9 +249,9 @@ void PitchDetector::processBlock(const juce::AudioBuffer<float> &buffer)
     if(pitchCandidates.empty()){
         float minVal = std::numeric_limits<float>::max();
         int minTau = -1;
-        for (int tau = 2; tau < dYinBufferSize - 1; ++tau) {
-            if (dYinBuffer[tau] < minVal) {
-                minVal = dYinBuffer[tau];
+        for (int tau = 2; tau < yinBufferSize - 1; ++tau) {
+            if (yinBuffer[tau] < minVal) {
+                minVal = yinBuffer[tau];
                 minTau = tau;
             }
         }
@@ -250,8 +261,14 @@ void PitchDetector::processBlock(const juce::AudioBuffer<float> &buffer)
     return pitchCandidates;
  }
 
- // DP algorithm for most probable hidden state sequence
- // in this case, finding the most likely pitch given the pitch context
+ /**
+  * @brief Find most likely pitch candidate given pitch context
+  * @param rawCandidates Array of pitch candidates populated by the pitch candidate finder
+  * @details DP algorithm for most probable hidden state sequence.
+  * Useing parabolically interpolated pitch candidate objects and cost function,
+  * find cheapest path from previous pitch to current,
+  * and return ideal pitch with the cheapest path.
+  */
  float PitchDetector::processViterbi(std::vector<std::pair<int, float>>& rawCandidates)
  {
     std::vector<PitchCandidate> currentCandidates;  
@@ -324,55 +341,15 @@ void PitchDetector::processBlock(const juce::AudioBuffer<float> &buffer)
     previousCandidates = currentCandidates;
 
     //5. Return ideal pitch + gate to cut the transients
-    if(currentCandidates[bestCandidate_x].probability < dVoiceThreshold) return 0.f;
+    if(currentCandidates[bestCandidate_x].probability < voiceThreshold) return 0.f;
     return currentCandidates[bestCandidate_x].pitch;
  }
 
- std::vector<float> PitchDetector::calculateProbabilities(std::vector<std::pair<int, float>>& candidates)
- {
-    std::vector<float> probabilities;
-    if(candidates.empty()) return probabilities;
-
-    // YIN to probabilities
-    float sum = 0.0f;
-    for (const auto& candidate : candidates) {
-        float prob = std::exp(-candidate.second * 10.0f);
-        probabilities.push_back(prob);
-        sum += prob;
-    }
-    
-    // Normalize
-    if (sum > 0.0f) {
-        for (float& prob : probabilities) {
-            prob /= sum;
-        }
-    }
-    
-    return probabilities;
- }
-
- // Viterbi algorithm
- float PitchDetector::temporalTracking(std::vector<std::pair<int, float>>& candidates, std::vector<float>& probabilities)
- {
-    if(candidates.empty()) return 0.0f;
-    float weightedSum = 0.0f;
-    float totalWeight = 0.0f;
-
-    for (int i = 0; i < candidates.size(); ++i) {
-        float pitch = convertLagToPitch(candidates[i].first);
-        weightedSum += pitch * probabilities[i];
-        totalWeight += probabilities[i];
-    }
-    
-    // Detect if voiced: if the signal is periodic or noisy
-    float bestProbability = probabilities.empty() ? 0.0f : probabilities[0];
-    if (bestProbability < dVoiceThreshold) {
-        return 0.0f; 
-    }
-    
-    return weightedSum / totalWeight;
- }
-
+ /**
+  * @brief Determine whether amplitude is being applied
+  * @param frame Raw audio data with windowing applied
+  * @details Repetitive function from Juce API
+  */
  float PitchDetector::calculateRMS(const std::vector<float>& frame)
  {
     float sumSquares = 0.0f;
@@ -382,17 +359,26 @@ void PitchDetector::processBlock(const juce::AudioBuffer<float> &buffer)
     return std::sqrt(sumSquares / frame.size());
  }
 
+ /**
+  * @brief Helper function to extract pitch value given ideal lag phase
+  */
  float PitchDetector::convertLagToPitch(float lag)
  {
     if (lag <= 0) return 0.0f;
     return static_cast<float>(sampleRate) / static_cast<float>(lag);
  }
 
+ /**
+  * @brief Getter for pitch
+  */
  float PitchDetector::getCurrentPitch()
  {
     return currentPitch;
  }
 
+ /**
+  * @brief Getter for midi note value, integer
+  */
  float PitchDetector::getCurrentMidiNote()
 {
     if (currentPitch <= 0.f) return 0.f;   
@@ -400,24 +386,32 @@ void PitchDetector::processBlock(const juce::AudioBuffer<float> &buffer)
 }
 
  /**
-  * Returns number of semitones above or below reference pitch
+  * @brief Returns number of semitones above or below reference pitch
+  * @details 
   * f = f₀ * 2^(n/12)
   * n = 12log_2(f / f₀)
   */
  float PitchDetector::getCurrentNote()
  {
     if (currentPitch <= 0.f) return 0.f;
-    return 12 * std::log2(currentPitch / dReferencePitch);
+    return 12 * std::log2(currentPitch / referencePitch);
  }
 
+ /**
+  * @brief Getter for difference between reference pitch and detected pitch.
+  * Use Pitch Corrector's getSemitoneError for difference between detected and target pitch.
+  */
  float PitchDetector::getSemitoneError()
  {
     return getCurrentNote() - getCurrentPitch();
  }
 
+ /**
+  * @brief Getter for name of current note. Assumes reference pitch of 440Hz
+  */
  std::string PitchDetector::getCurrentNoteName()
  {
     int index = (int)(getCurrentNote()) % 12;
     if (index < 0) index += 12;
-    return cNoteNames[index];
+    return noteNames[index];
  }

@@ -12,7 +12,9 @@
  #include <juce_dsp/juce_dsp.h> 
  #include <cmath>
 
- // Public interface class for testing
+ /**
+  * Public interface class for testing
+  */
  class IPitchDetector{
  public:
     virtual ~IPitchDetector() = default;
@@ -22,6 +24,13 @@
     virtual float getCurrentMidiNote() = 0;
  };
 
+ /**
+  * @brief Candidate object for determining best pitch
+  * @details 
+  * Has pitch, probability, and cost properties.
+  * Probability is likelihood that it is the actual note.
+  * Cost is how much it takes to get from the previous  note to this.
+  */
  struct PitchCandidate{
     float pitch;
     float probability;
@@ -40,7 +49,6 @@
 
         // Process a block of audio
         void processBlock(const juce::AudioBuffer<float>&) override;
-
         void processFrame(const std::vector<float>&);
 
         float getCurrentPitch() override;
@@ -53,61 +61,42 @@
         ~PitchDetector();
 
     private:
-        /**
-         * Autocorrection, Difference, Cumulative
-         */
         void difference(const std::vector<float>&);
         void cumulative();
         int absoluteThreshold();
         float calculateRMS(const std::vector<float>&);
-
-        float currentPitch;                // Pitch of most recent sample batch in Hz
-        double sampleRate;                 // Sample rate
-        int dWindowSize;                    // interval i to 2W
-        int dYinBufferSize;                 // W, on sum j = t + 1 to t + W
-        int dLag;                           // Lag
-        std::vector<float> dYinBuffer;      // YIN buffer
-        std::vector<float> dCircularBuffer; // Accumulative buffer of samples from AudioBuffer
-        int dCircularIdx;                   // Start position in circular buffer
-        int dHopSize;                       // Amount to jump fwd by. Creates overlapping frames.
-        int dSamplesUntilHop;
-        juce::dsp::WindowingFunction<float>::WindowingMethod dWindow; // Hann window
-        std::vector<float> dWindowFunction; 
-        std::vector<float> frame;
-        std::vector<float> r;
-        
-        float dCurrentAmp;                  // Amplitude tracker for RMS cutoff
-        float dAmpThreshold;                // Threshold for RMS cutoff
-
-        /**
-         * YIN
-         */
-        double dThresh;                     // Threshold for YIN
         float convertLagToPitch(float);     // Helper function for YIN
-        float dReferencePitch;              // Pitch that notes are tuned to
-        std::string cNoteNames[12] = {
+        float parabolicMinimum(int);        // Helper function for Viterbi
+        std::vector<std::pair<int, float>> findPitchCandidates();
+        float processViterbi(std::vector<std::pair<int, float>>&);
+        void prepareFFT(int);               // Helper function for FFT
+
+        float currentPitch;                 // Pitch of most recent sample batch in Hz
+        double sampleRate;                  // Sample rate
+        int windowSize;                     // YIN algorithm: interval i to 2W
+        int yinBufferSize;                  // YIN algorithm: W, on sum j = t + 1 to t + W
+        std::vector<float> yinBuffer;       // YIN buffer
+        std::vector<float> circularBuffer;  // Accumulative buffer of samples in Process Block
+        int circularIdx;                    // Start position in circular buffer
+        int hopSize;                        // Amount to jump fwd by. Creates overlapping frames.
+        int samplesUntilHop;                // Decrease lag: do not hop until this threshold is met
+        std::vector<float> windowFunction;  // Hann window
+        std::vector<float> circularFrame;   // Circular Buffer * Windowing Function in Process Block
+        std::vector<float> r;               // Running sum for difference function
+        float currentAmp;                   // Amplitude tracker for RMS cutoff
+        float ampThreshold;                 // Threshold for RMS cutoff
+        float referencePitch;               // Pitch that notes are tuned to
+        std::vector<std::vector<float>> pitchCandidates; // Likely pitch per frame for pYIN
+        float voiceThreshold;                            // Min threshold for a freq to be considered voiced
+        std::vector<PitchCandidate> previousCandidates;
+        float transitionCost = 15.f;                     // Penalty for changing pitch
+
+        std::unique_ptr<juce::dsp::FFT> forwardFFT;      // Contain FFT info
+        std::vector<float> fftTemp;                      // Temporary buffer for intermediate FFT calculations
+        std::vector<float> cumulativeSquare;             // Buffer to store x^2 operations
+
+        std::string noteNames[12] = {
                 "A", "A#", "B", "C", "C#", "D", 
                 "D#", "E", "F", "F#", "G", "G#"
             };
-        
-        /**
-         * pYIN
-         */
-        std::vector<float> calculateProbabilities(std::vector<std::pair<int, float>>&);
-        float temporalTracking(std::vector<std::pair<int, float>>&, std::vector<float>&);
-
-        std::vector<std::vector<float>> pitchCandidates; // Likely pitch per frame for pYIN
-        std::vector<float> pitchProbabilities;           // Probabilities per candidate
-        std::vector<float> smoothedPitchTrack;           // Temporal smoothing
-        float dVoiceThreshold;                            // Min threshold for a freq to be considered voiced
-        int dMaxCandidates;                               // Number of candidates to consider
-
-        /**
-         * Viterbi
-         */
-        std::vector<PitchCandidate> previousCandidates;
-        float transitionCost = 15.f; // Penalty for changing pitch
-        float parabolicMinimum(int);
-        std::vector<std::pair<int, float>> findPitchCandidates();
-        float processViterbi(std::vector<std::pair<int, float>>&);
  };

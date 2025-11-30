@@ -9,6 +9,9 @@
 #include <JuceHeader.h>
 #include <rubberband/RubberBandStretcher.h>
 
+/**
+ * Public interface class for testing
+ */
 class IPitchShifter{
 public:
     virtual ~IPitchShifter() = default;
@@ -33,7 +36,7 @@ class PitchShifter : public IPitchShifter{
         std::unique_ptr<RubberBand::RubberBandStretcher> stretcher;
         int bufferSize;
 
-        juce::AudioBuffer<float> inputBuffer; // Buffer sizes are mismatched by RubberBand so have two buffers to handle this
+        juce::AudioBuffer<float> inputBuffer; // Rubber Band stretches audio and thus changes the buffer size, hence two buffers
         juce::AudioBuffer<float> outputBuffer;
 
         //indexes
