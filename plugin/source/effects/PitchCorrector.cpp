@@ -1,5 +1,10 @@
 #include "Pitchblade/effects/PitchCorrector.h"
 
+/**
+ * @brief Prepare block to initialize corrector
+ * @param sampleRate A reasonable value is 44100 Hz
+ * @param blockSize The size of the buffer passed to pitch corrector
+ */
 void PitchCorrector::prepare(double sampleRate, int blockSize)
 {
     this->sampleRate = sampleRate;
@@ -19,6 +24,12 @@ void PitchCorrector::prepare(double sampleRate, int blockSize)
     stableCount = 0;
     monoBuffer.setSize(1, blockSize);
 }
+
+/**
+ * @brief Pitch detection handler
+ * @param buffer Raw audio data for pitch correction
+ * @details Call pitch detection, then 
+ */
 void PitchCorrector::processBlock(juce::AudioBuffer<float>& buffer){
     // Process pitch detection
     auto numSamples = buffer.getNumSamples();
