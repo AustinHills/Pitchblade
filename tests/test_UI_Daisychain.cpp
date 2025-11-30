@@ -476,7 +476,6 @@ TEST(DaisyChainTest, ClosingOverlayUnlocksReorder) {
     EXPECT_EQ(unlockedOrder[0], baseline.back());
 }
 
-
 // TC-36 Global Bypass Button Behavior
 TEST(DaisyChainTest, GlobalBypassUpdatesProcessorAndUI) {
     AudioPluginAudioProcessor proc;
