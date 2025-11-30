@@ -1,3 +1,15 @@
+/*
+PluginEditor class builds and manages the entire Pitchblade user interface
+
+It owns all of the UI components, including the TopBar, DaisyChain, EffectPanel, VisualizerPanel,
+SettingsPanel, and PresetsPanel. It handles layout, resizing, and interaction logic between all
+components. 
+
+It listens for user interaction and keeps the UI in sync with the processors. The editor also 
+rebuilds the chain view when loading presets, reordering nodes, or changing effect modes
+It also applies the custom Look and Feel for the plugin.
+*/
+
 #pragma once
 #include "PluginProcessor.h"
 
@@ -12,33 +24,36 @@
 #include "ui/EffectPanel.h"
 #include "ui/VisualizerPanel.h"
 
-#include "Pitchblade/panels/EffectNode.h"
-
 #include "Pitchblade/panels/SettingsPanel.h"    // Austin
 #include "Pitchblade/panels/PresetsPanel.h"     // reyna
-
+#include "Pitchblade/panels/EffectNode.h"       // for each effectPanel
 
 //==============================================================================
 class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
                                               public juce::DragAndDropContainer,
-                                              public juce::Button::Listener,     // Austin added this for the settings panel
+                                              public juce::Button::Listener,     // Austin -  added this for the settings panel
 	                                          public juce::MouseListener         // reyna - for presets/settings closing on outside click
 {
 public:
     explicit AudioPluginAudioProcessorEditor (AudioPluginAudioProcessor&);
     ~AudioPluginAudioProcessorEditor() override;
-	void rebuildAndSyncUI(); // reyna - rebuild daisy chain and effect panel ui to sync with processor
-
     //==============================================================================
     void paint (juce::Graphics&) override;
     void resized() override;
 
-	void applyRowTooltips();    //reyna tooltip helper
+	void rebuildAndSyncUI();    // reyna - rebuild daisy chain and effect panel ui to sync with processor
+	void applyRowTooltips();    // reyna - tooltip helper
 
-    //Austin
-    void buttonClicked(juce::Button* button) override;
+    // bypass helpers - reyna
+    bool areAllEffectsBypassed() const;
+    void setAllEffectsBypassed(bool shouldBypass);
+    void syncGlobalBypassButton();
+    bool isLockBypassActive = false;
 
-	// getters for presets and settings panels - reyna 
+	// active effect button color helpers - reyna
+    void setActiveEffectByName(const juce::String& effectName); 
+
+	// getters for presets/settings panels - reyna 
     DaisyChain& getDaisyChain() { return daisyChain; }
     EffectPanel& getEffectPanel() { return effectPanel; }
     VisualizerPanel& getVisualizer() { return visualizer; }
@@ -50,7 +65,8 @@ public:
     void showSettings();
     bool isSettingsVisible() const;
 
-    void setActiveEffectByName(const juce::String& effectName);  //daisychain active button
+	//Austin - button listener for settings/presets panel
+    void buttonClicked(juce::Button* button) override;
 
 private:
     // This reference is provided as a quick way for your editor to access the processor object that created it.
@@ -61,13 +77,12 @@ private:
                                                 
     TopBar topBar;
     DaisyChain daisyChain;
-    
     EffectPanel effectPanel;
     VisualizerPanel visualizer;
 
-    juce::String activeEffectName;
+	juce::String activeEffectName;  // for active effect button coloring
 
-    TooltipManager tooltipManager;
+	TooltipManager tooltipManager;  // tooltip manager
     std::unique_ptr<juce::TooltipWindow> tooltipWindow;
 
 	// reyna presets panel              
@@ -75,7 +90,7 @@ private:
 	juce::Component presetsBackdrop;    // backdrop when presets panel is open
     bool isShowingPresets = false;
 
-    //Austin added this
+	//Austin settings panel
     SettingsPanel settingsPanel;
     bool isShowingSettings = false;
 

@@ -11,11 +11,12 @@
 class EqualizerPanel : public juce::Component, public juce::ValueTree::Listener {
 public:
     //explicit EqualizerPanel (AudioPluginAudioProcessor& proc);
-    EqualizerPanel(AudioPluginAudioProcessor& p, juce::ValueTree& state);
+    EqualizerPanel(AudioPluginAudioProcessor& p, juce::ValueTree& state, const juce::String& nodeTitle);
 
     // display panel
     void paint(juce::Graphics& g) override;
     void resized() override;
+    juce::String panelTitle;
 
     // destructor
     ~EqualizerPanel() override;
@@ -35,60 +36,10 @@ private:
     juce::Label  lowFreqLabel,  lowGainLabel,
                  midFreqLabel,  midGainLabel,
                  highFreqLabel, highGainLabel;
-    juce::Label panelTitle;
+    juce::Label equalizerLabel;
 
     void valueTreePropertyChanged(juce::ValueTree& tree, const juce::Identifier& property) override;
-
-    /*juce::AudioProcessorValueTreeState::SliderAttachment
-        lowFreqAttachment,  lowGainAttachment,
-        midFreqAttachment,  midGainAttachment,
-        highFreqAttachment, highGainAttachment;*/
 };
-
-// unneeded values now set in pluginprocessor.cpp in createParameterLayout
-
-//EqualizerPanel::EqualizerPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& stateToUse)
-//    : processor(proc),
-//    lowFreqAttachment(processor.apvts, "EQ_LOW_FREQ", lowFreq),
-//    lowGainAttachment(processor.apvts, "EQ_LOW_GAIN", lowGain),
-//    midFreqAttachment(processor.apvts, "EQ_MID_FREQ", midFreq),
-//    midGainAttachment(processor.apvts, "EQ_MID_GAIN", midGain),
-//    highFreqAttachment(processor.apvts, "EQ_HIGH_FREQ", highFreq),
-//    highGainAttachment(processor.apvts, "EQ_HIGH_GAIN", highGain)
-//{
-//    // identical knob setup as your default constructor
-//    setupKnob(lowFreq, lowFreqLabel, "Low Freq (Hz)", 20.0, 1000.0, 1.0, false);
-//    setupKnob(lowGain, lowGainLabel, "Low Gain (dB)", -24.0, 24.0, 0.1, true);
-//    setupKnob(midFreq, midFreqLabel, "Mid Freq (Hz)", 200.0, 6000.0, 1.0, false);
-//    setupKnob(midGain, midGainLabel, "Mid Gain (dB)", -24.0, 24.0, 0.1, true);
-//    setupKnob(highFreq, highFreqLabel, "High Freq (Hz)", 1000.0, 18000.0, 1.0, false);
-//    setupKnob(highGain, highGainLabel, "High Gain (dB)", -24.0, 24.0, 0.1, true);
-//
-//    addAndMakeVisible(lowFreq);   addAndMakeVisible(lowFreqLabel);
-//    addAndMakeVisible(lowGain);   addAndMakeVisible(lowGainLabel);
-//    addAndMakeVisible(midFreq);   addAndMakeVisible(midFreqLabel);
-//    addAndMakeVisible(midGain);   addAndMakeVisible(midGainLabel);
-//    addAndMakeVisible(highFreq);  addAndMakeVisible(highFreqLabel);
-//    addAndMakeVisible(highGain);  addAndMakeVisible(highGainLabel);
-//}
-
-
-//// ===================== Node =====================
-//class EqualizerNode : public EffectNode
-//{
-//public:
-//    explicit EqualizerNode (AudioPluginAudioProcessor& proc);
-//    EqualizerNode (AudioPluginAudioProcessor& proc, const juce::ValueTree& state);
-//
-//    // UI creator
-//    std::unique_ptr<juce::Component> createPanel (AudioPluginAudioProcessor& proc) override;
-//
-//    // DSP step
-//    void process (AudioPluginAudioProcessor& proc, juce::AudioBuffer<float>& buffer) override;
-//
-//    // Clone node
-//    std::shared_ptr<EffectNode> clone() const override;
-//};
 
 class EqualizerNode : public EffectNode
 {
@@ -119,7 +70,7 @@ public:
 
     // use node state for the panel
     std::unique_ptr<juce::Component> createPanel(AudioPluginAudioProcessor& proc) override {
-        return std::make_unique<EqualizerPanel>(proc, getMutableNodeState());
+        return std::make_unique<EqualizerPanel>(proc, getMutableNodeState(), effectName);
     }
 
     // Provide a visualizer component for VisualizerPanel

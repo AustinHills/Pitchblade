@@ -4,8 +4,8 @@
 #include "Pitchblade/panels/DeEsserPanel.h"
 #include "Pitchblade/ui/ColorPalette.h"
 
-DeEsserPanel::DeEsserPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& state) : processor(proc), localState(state)
-{
+DeEsserPanel::DeEsserPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& state, const juce::String& nodeTitle)
+    : processor(proc), localState(state), panelTitle(nodeTitle) {
     // label names for dials - reyna
     thresholdSlider.setName("Threshold");
     ratioSlider.setName("Ratio");
@@ -14,7 +14,7 @@ DeEsserPanel::DeEsserPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& sta
     frequencySlider.setName("Frequency");
 
     // Main Label
-    deEsserLabel.setText("De-Esser", juce::dontSendNotification);
+    deEsserLabel.setText(panelTitle, juce::dontSendNotification);
     addAndMakeVisible(deEsserLabel);
     deEsserLabel.setName("NodeTitle");
 

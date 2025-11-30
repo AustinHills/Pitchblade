@@ -93,11 +93,12 @@ public:
 
     void resized() override;
     void paint(juce::Graphics&) override;
+    juce::String panelTitle;
 
     void valueTreePropertyChanged(juce::ValueTree& tree, const juce::Identifier& property) override;
 
     //volume meter - reyna
-    explicit CompressorPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& state, CompressorNode* nodePtr = nullptr); //reference to active compressor node 
+    explicit CompressorPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& state, CompressorNode* nodePtr, const juce::String& nodeTitle); //reference to active compressor node 
 
 private:
     // Reference back to main processor
@@ -238,7 +239,7 @@ public:
 
     // return UI panel linked to node
     std::unique_ptr<juce::Component> createPanel(AudioPluginAudioProcessor& proc) override {
-        return std::make_unique<CompressorPanel>(proc, getMutableNodeState(), this);
+        return std::make_unique<CompressorPanel>(proc, getMutableNodeState(), this, effectName);
     }
 
     // return visualizer 

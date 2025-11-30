@@ -1,17 +1,21 @@
 #include "Pitchblade/PluginProcessor.h"
 #include "Pitchblade/PluginEditor.h"
-
+//austin
 #include "Pitchblade/panels/GainPanel.h"
 #include "Pitchblade/panels/NoiseGatePanel.h"
-#include "Pitchblade/panels/FormantPanel.h"
-#include "Pitchblade/panels/PitchPanel.h"
 #include "Pitchblade/panels/CompressorPanel.h"
 #include "Pitchblade/panels/DeEsserPanel.h"
 #include "Pitchblade/panels/DeNoiserPanel.h"
 #include "Pitchblade/panels/EffectNode.h"
-
+//huda
+#include "Pitchblade/panels/FormantPanel.h"
 #include "Pitchblade/panels/EqualizerPanel.h"
+//hayley
+#include "Pitchblade/panels/PitchPanel.h"
+
 //==============================================================================
+// Constructor: sets up the plugin's audio input/output, creates all parameter definitions,
+// and initializes the ValueTree used to store the effect chain state for saving/loading 
 AudioPluginAudioProcessor::AudioPluginAudioProcessor()
      : AudioProcessor (BusesProperties()
                      #if ! JucePlugin_IsMidiEffect
@@ -21,24 +25,27 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
                        ), 
-                       pitchProcessor(pitchDetector, pitchShifter),
+                       // Create the internal pitch correction processor
+                       pitchProcessor(pitchDetector, pitchShifter), 
 
-	//apvts contructor: attachs this to processor
-    // AudioProcessorValueTreeState used to managea ValueTree that is used to manage an AudioProcessor's entire state
+    // Create the AudioProcessorValueTreeState that stores all parameters.
+    // It owns every parameter defined in createParameterLayout and handles
+    // automation and preset saving
     apvts(*this, nullptr, "Parameters", createParameterLayout()) {
-	        // check if effectNodes tree exists
+	    // check if effectNodes tree exists
+        // branch stores the layout of the DaisyChain - effect ordering,
+        // unique IDs, and all ValueTrees belonging to each EffectNode
         if (!apvts.state.hasType("EffectNodes")) {
             apvts.state = juce::ValueTree("EffectNodes");   
         }
     }
 
-AudioPluginAudioProcessor::~AudioPluginAudioProcessor(){
-    suspendProcessing(true);
-}
+// Destructor: ensures processor is suspended when the its deleted
+AudioPluginAudioProcessor::~AudioPluginAudioProcessor(){ suspendProcessing(true); }
 
 //============================================================================== reyna
-// ui stuff: global APVTS perameter layout 
-// no longer shared controls works as a template
+// global APVTS parameter layout
+// no longer shared controls - works as a template
 // defines all default perameters, all effects creates local copies into their valuetree
 juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::createParameterLayout() {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
@@ -67,7 +74,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::c
     params.push_back(std::make_unique<juce::AudioParameterBool>(
         "COMP_LIMITER_MODE", "Compressor Limiter Mode", "False"));
 
-    // Formant Shifter : huda
+	// De-Esser : austin
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "DEESSER_THRESHOLD", "DeEsser Threshold", juce::NormalisableRange<float>(-100.0f, 0.0f, 0.1f), 0.0f));
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
@@ -76,6 +83,16 @@ juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::c
         "DEESSER_ATTACK", "DeEsser Attack", juce::NormalisableRange<float>(1.0f, 200.0f, 0.1f), 5.0f));
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "DEESSER_RELEASE", "DeEsser Release", juce::NormalisableRange<float>(1.0f, 300.0f, 0.1f), 5.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "DEESSER_FREQUENCY", "DeEsser Frequency", juce::NormalisableRange<float>(2000.0f, 12000.0f, 10.0f), 6000.0f));
+
+    //De-Noiser : austin
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "DENOISER_REDUCTION", "DeNoiser Reduction", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        "DENOISER_LEARN", "DeNoiser Learn", false));
+
+	// Formant Shifter : huda
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         PARAM_FORMANT_SHIFT, "Formant",
         juce::NormalisableRange<float>(-50.0f, 50.0f, 0.01f, 1.0f), 0.0f));
@@ -98,16 +115,6 @@ juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::c
         PARAM_FORMANT_MIX, "Dry/Wet",
         juce::NormalisableRange<float>(0.0f, 1.0f, 0.0001f, 1.0f), 1.0f)); // full wet by default for obviousness
 
-    //De-Noiser : austin
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "DENOISER_REDUCTION", "DeNoiser Reduction", juce::NormalisableRange<float>(0.0f,1.0f,0.01f),0.0f));
-    params.push_back(std::make_unique<juce::AudioParameterBool>(
-        "DENOISER_LEARN", "DeNoiser Learn", false));
-
-    //Settings Panel: austin
-    params.push_back(std::make_unique<juce::AudioParameterInt>(
-        "GLOBAL_FRAMERATE", "Global Framerate", 1, 4, 3));
-
     //Pitch Shifter: hayley
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "PITCH_RETUNE_SPEED", "Pitch Retune Speed", juce::NormalisableRange<float>(0.0f, 1.0f, 0.05f), 1.0f));
@@ -118,13 +125,15 @@ juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::c
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "PITCH_TRANSITION", "Pitch Note Transition", juce::NormalisableRange<float>(0.0f, 50.0f, 1.0f), 20.0f));
 
-    return { params.begin(), params.end() };
+    //Settings Panel: austin
+    params.push_back(std::make_unique<juce::AudioParameterInt>(
+        "GLOBAL_FRAMERATE", "Global Framerate", 1, 4, 3));
 
+    return { params.begin(), params.end() };
 }
 
-//==============================================================================
-// layout request from UI thread 
-// stores new rows and applies on audio thread - reyna
+//============================================================================== layout request from UI thread  - reyna
+// stores new rows and applies on audio thread
 void AudioPluginAudioProcessor::requestLayout(const std::vector<Row>& newRows) {
     std::lock_guard<std::recursive_mutex> lock(audioMutex);
     pendingRows = newRows;
@@ -137,11 +146,11 @@ static std::shared_ptr<EffectNode> findByName(const std::vector<std::shared_ptr<
     return {};
 }
 
+// get current pending layout rows
 std::vector<AudioPluginAudioProcessor::Row> AudioPluginAudioProcessor::getCurrentLayoutRows() {
     std::lock_guard<std::recursive_mutex> lock(audioMutex);
     return pendingRows;
 }
-
 
 // apply pending layout on audio thread
 // reconnect effect nodes based on pending rows
@@ -151,15 +160,19 @@ void AudioPluginAudioProcessor::applyPendingLayout() {
         return;
 
 	std::vector<std::shared_ptr<EffectNode>> old = effectNodes; // copy of current list
+
+    // reset connections and mode
     for (auto& n : old) if (n) {
-		n->clearConnections(); n->chainMode = ChainMode::Down;  // reset connections and mode
+		n->clearConnections(); n->chainMode = ChainMode::Down;  
     }
 
-	auto getRowNodes = [&](const Row& r) -> std::pair<std::shared_ptr<EffectNode>, std::shared_ptr<EffectNode>> {   // helper to get nodes by row
+    // helper to get nodes by row
+	auto getRowNodes = [&](const Row& r) -> std::pair<std::shared_ptr<EffectNode>, std::shared_ptr<EffectNode>> {   
         return { findByName(old, r.left), r.right.isNotEmpty() ? findByName(old, r.right) : nullptr };
         };
 
-	std::shared_ptr<EffectNode> prevL = nullptr, prevR = nullptr;   // previous left/right nodes 
+    // previous left/right nodes
+	std::shared_ptr<EffectNode> prevL = nullptr, prevR = nullptr;   
     bool prevWasDouble = false;
 
 	for (int i = 0; i < (int)pendingRows.size(); ++i) { // iterate rows
@@ -203,23 +216,22 @@ void AudioPluginAudioProcessor::applyPendingLayout() {
 	// rebuild new effect node list
     std::vector<std::shared_ptr<EffectNode>> newList;
     newList.reserve(pendingRows.size() * 2);
-    for (auto& r : pendingRows) { 	                                                                 // add nodes in order of rows
-		if (auto n = findByName(old, r.left)) { newList.push_back(n); }	                            // add left node
+    for (auto& r : pendingRows) { 	                                            // add nodes in order of rows
+		if (auto n = findByName(old, r.left)) { newList.push_back(n); }	        // add left node
         if (!r.right.isEmpty()) {
             if (auto m = findByName(old, r.right)) { newList.push_back(m); }    // add right node if exists
         }
     }
 
-	// update effect node list
+	// update effect node list and root
     if (!newList.empty()) {
         effectNodes = std::move(newList);
         activeNodes = std::make_shared<std::vector<std::shared_ptr<EffectNode>>>(effectNodes);
         rootNode = effectNodes.front();
     }
 
-        // rebuild UI safely without capturing a raw this
-    if (auto* ed = dynamic_cast<AudioPluginAudioProcessorEditor*>(getActiveEditor()))
-    {
+    // rebuild UI safely 
+    if (auto* ed = dynamic_cast<AudioPluginAudioProcessorEditor*>(getActiveEditor())) {
         juce::Component::SafePointer<AudioPluginAudioProcessorEditor> safe(ed);
         juce::MessageManager::callAsync([safe]() {
             if (auto* e = safe.getComponent())
@@ -229,11 +241,10 @@ void AudioPluginAudioProcessor::applyPendingLayout() {
 
 }
 
-//==============================================================================
-
-// preset save/load - reyna
+//============================================================================== preset save/load - reyna
+// saving presets to file
 void AudioPluginAudioProcessor::savePresetToFile(const juce::File& file) {
-	std::lock_guard<std::recursive_mutex> lock(audioMutex);             // lock mutex for thread safety
+	std::lock_guard<std::recursive_mutex> lock(audioMutex);    // lock mutex for thread safety
 
 	// create XML root
     juce::XmlElement presetRoot("PitchbladePreset");
@@ -321,7 +332,8 @@ void AudioPluginAudioProcessor::loadPresetFromFile(const juce::File& file) {
         if (nodeXml->hasAttribute("chainMode"))
             node->chainMode = (ChainMode)nodeXml->getIntAttribute("chainMode");
 
-        auto& vt = node->getMutableNodeState(); // node API from EffectNode
+        // node API from EffectNode
+        auto& vt = node->getMutableNodeState(); 
         vt.setProperty("uuid", juce::Uuid().toString(), nullptr);
 
         // give node back its unique name
@@ -334,7 +346,7 @@ void AudioPluginAudioProcessor::loadPresetFromFile(const juce::File& file) {
     auto* layout = xml->getChildByName("ChainLayout");
     if (layout != nullptr) {
         std::vector<Row> loadedRows;
-
+		// read each row
         forEachXmlChildElement(*layout, rowXml) {
             AudioPluginAudioProcessor::Row r;
             r.left = rowXml->getStringAttribute("left");
@@ -353,9 +365,11 @@ void AudioPluginAudioProcessor::loadPresetFromFile(const juce::File& file) {
         for (auto& node : effectNodes)
             if (node) node->clearConnections();
 
+		// simple linear connect
         for (int i = 0; i + 1 < (int)effectNodes.size(); ++i)
             effectNodes[i]->connectTo(effectNodes[i + 1]);
 
+		// update active nodes and root
         activeNodes = std::make_shared<std::vector<std::shared_ptr<EffectNode>>>(effectNodes);
         rootNode = effectNodes.empty() ? nullptr : effectNodes.front();
 
@@ -372,7 +386,7 @@ void AudioPluginAudioProcessor::loadPresetFromFile(const juce::File& file) {
         layoutRequested.store(false);
     }
 
-    // update ui
+    // update ui 
     juce::MessageManager::callAsync([this]() {
         if (auto* editor = dynamic_cast<AudioPluginAudioProcessorEditor*>(getActiveEditor()))
             editor->rebuildAndSyncUI();
@@ -380,7 +394,8 @@ void AudioPluginAudioProcessor::loadPresetFromFile(const juce::File& file) {
     juce::Logger::outputDebugString("loaded preset from: " + file.getFullPathName());
 }
 
-//==============================================================================
+//============================================================================== 
+// The following methods implement the basic behavior of the plugin processor.
 
 const juce::String AudioPluginAudioProcessor::getName() const {
     return JucePlugin_Name;
@@ -437,15 +452,11 @@ void AudioPluginAudioProcessor::changeProgramName (int index, const juce::String
 }
 
 //==============================================================================
-void AudioPluginAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
-{
-    // Use this method as the place to do any pre-playback
-    // initialisation that you need..
-
+// where you prepare the processor to play
+void AudioPluginAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock) {
     setRateAndBufferSizeDetails(sampleRate, samplesPerBlock);
 
     juce::ignoreUnused (sampleRate, samplesPerBlock);
-    
     currentBlockSize = samplesPerBlock; // Austin
 
 	//intialize dsp processors
@@ -454,9 +465,11 @@ void AudioPluginAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
     formantShifter.prepare (sampleRate, samplesPerBlock, getTotalNumInputChannels()); //huda 
     equalizer.prepare(sampleRate, samplesPerBlock, getTotalNumInputChannels()); //huda
 
+	// lock mutex for thread safety - reyna
     std::lock_guard<std::recursive_mutex> lock(audioMutex);
 
 	//effect node building - reyna
+	// create all default effect nodes and store in effectNodes vector
     effectNodes.clear();
     effectNodes.push_back(std::make_shared<GainNode>(*this));
     effectNodes.push_back(std::make_shared<NoiseGateNode>(*this));
@@ -472,15 +485,17 @@ void AudioPluginAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
 	for (auto& n : effectNodes) 
         if (n) n->clearConnections();   //clear any existing connections
 
+	// simple linear connect 
     for (size_t i = 0; i + 1 < effectNodes.size(); ++i) {
         effectNodes[i]->connectTo(effectNodes[i + 1]);
     }
 
-	activeNodes = std::make_shared<std::vector<std::shared_ptr<EffectNode>>>(effectNodes);  // shared pointer to active nodes for audio thread
+    // shared pointer to active nodes for audio thread
+	activeNodes = std::make_shared<std::vector<std::shared_ptr<EffectNode>>>(effectNodes); 
     rootNode = effectNodes.front();
 
-    if (auto* ed = dynamic_cast<AudioPluginAudioProcessorEditor*>(getActiveEditor()))
-    {
+	// rebuild UI safely
+    if (auto* ed = dynamic_cast<AudioPluginAudioProcessorEditor*>(getActiveEditor())) {
         juce::Component::SafePointer<AudioPluginAudioProcessorEditor> safe(ed);
         juce::MessageManager::callAsync([safe]() {
             if (auto* e = safe.getComponent())
@@ -489,14 +504,12 @@ void AudioPluginAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
     }
 }
 
-void AudioPluginAudioProcessor::releaseResources()
-{
+void AudioPluginAudioProcessor::releaseResources() {
     // When playback stops, you can use this as an opportunity to free up any
     // spare memory, etc.
 }
 
-bool AudioPluginAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
-{
+bool AudioPluginAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const {
   #if JucePlugin_IsMidiEffect
     juce::ignoreUnused (layouts);
     return true;
@@ -519,29 +532,21 @@ bool AudioPluginAudioProcessor::isBusesLayoutSupported (const BusesLayout& layou
   #endif
 }
 //==============================================================================
+//real time processor to update everything
+// main audio processing block
 void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) {   
-    //real time processor to update everything
-    
-    // MOVED ALL PROCESS BLOCK STUFF INTO EFFECTNODE AGAINNN DX - reyna
-	// all individual processors are called in their respective effect nodes (in their panel.h)
+	// all individual processors are called in their respective effect nodes (in their panel.h) - reyna
     juce::ignoreUnused (midiMessages);
     juce::ScopedNoDenormals noDenormals;
 
     applyPendingLayout();
-    //applyPendingReorder();
 
-    // indivdual bypass checker reyna
-	// process and forward only if root node exists and plugin is not globally bypassed
-    //  for future chaining effects theyre all the same rn
+	// process audio through daisy chain - reyna
     if (!isBypassed() && activeNodes && !activeNodes->empty()) {
-		auto chain = activeNodes; // copy shared
+		auto chain = activeNodes;   // copy shared
 		auto root = chain->front(); //  get root node
-        if (root)
-            root->processAndForward(*this, buffer);
-    } else {
-        //Austin - this was causing absolutely no audio to go through when there was a global bypass, which is not intended functionality. I commented it out
-        //buffer.clear();
-    }
+        if (root) root->processAndForward(*this, buffer);
+    } 
 
     //juce boilerplate
     for (auto i = getTotalNumInputChannels(); i < getTotalNumOutputChannels(); ++i) {
@@ -550,38 +555,24 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, 
 }
 
 //==============================================================================
-bool AudioPluginAudioProcessor::hasEditor() const
-{
+bool AudioPluginAudioProcessor::hasEditor() const {
     return true; // (change this to false if you choose to not supply an editor)
 }
 
-juce::AudioProcessorEditor* AudioPluginAudioProcessor::createEditor()
-{
+juce::AudioProcessorEditor* AudioPluginAudioProcessor::createEditor() {
     return new AudioPluginAudioProcessorEditor (*this);
 }
 
 //==============================================================================
-// looks like save/load stuff that we can use later - reyna
-void AudioPluginAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
-{
-    // You should use this method to store your parameters in the memory block.
-    // You could do that either as raw data, or use the XML or ValueTree classes
-    // as intermediaries to make it easy to save and load complex data.
-    // juce::ignoreUnused (destData);
-
-	// reyna: use APVTS to save state
-	// create an XML representation of our state
-    auto xml = apvts.copyState().createXml();
-    copyXmlToBinary(*xml, destData);
+// State saving/loading - reyna
+void AudioPluginAudioProcessor::getStateInformation (juce::MemoryBlock& destData) {
+	auto xml = apvts.copyState().createXml();   // get ValueTree as XML
+	copyXmlToBinary(*xml, destData);            // copy to binary blob
 }
 
-void AudioPluginAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
-{
-    // You should use this method to restore your parameters from this memory block,
-    // whose contents will have been created by the getStateInformation() call.
-    // juce::ignoreUnused (data, sizeInBytes);
-
-    //reyna
+// loading state from binary blob - reyna
+void AudioPluginAudioProcessor::setStateInformation (const void* data, int sizeInBytes) {
+	// parse XML from binary blob
     std::unique_ptr<juce::XmlElement> xml(getXmlFromBinary(data, sizeInBytes));
     if (xml) {
         apvts.replaceState(juce::ValueTree::fromXml(*xml));
@@ -595,6 +586,7 @@ juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
     return new AudioPluginAudioProcessor();
 }
 
+//==============================================================================
 //==============================================================================
 
 // Default preset loader - reyna
@@ -620,12 +612,15 @@ void AudioPluginAudioProcessor::loadDefaultPreset(const juce::String& type) {
     for (auto& node : effectNodes)
         if (node) node->clearConnections();
 
+	// simple linear connect
     for (int i = 0; i + 1 < (int)effectNodes.size(); ++i)
         effectNodes[i]->connectTo(effectNodes[i + 1]);
 
+	// update active nodes and root
     activeNodes = std::make_shared<std::vector<std::shared_ptr<EffectNode>>>(effectNodes);
     rootNode = effectNodes.front();
 
+	// rebuild UI safely
     if (auto* ed = dynamic_cast<AudioPluginAudioProcessorEditor*>(getActiveEditor())) {
         juce::Component::SafePointer<AudioPluginAudioProcessorEditor> safe(ed);
         juce::MessageManager::callAsync([safe]() {
@@ -641,13 +636,12 @@ void AudioPluginAudioProcessor::loadDefaultPreset(const juce::String& type) {
         if (!node) continue;
         Row r;
         r.left = node->effectName;
-        //r.right = {};
         pendingRows.push_back(r);
     }
     layoutRequested.store(true);      
 }
 
-//for empty daisychain preset
+// empty daisychain preset
 void AudioPluginAudioProcessor::clearAllNodes() {
     const std::lock_guard<std::recursive_mutex> lock(getMutex());
     // clear dsp
@@ -662,8 +656,7 @@ void AudioPluginAudioProcessor::clearAllNodes() {
     rootNode = nullptr;
     activeNodes = std::make_shared<std::vector<std::shared_ptr<EffectNode>>>();
     // rebuild UI
-    if (auto* ed = dynamic_cast<AudioPluginAudioProcessorEditor*>(getActiveEditor()))
-    {
+    if (auto* ed = dynamic_cast<AudioPluginAudioProcessorEditor*>(getActiveEditor())) {
         auto& dc = ed->getDaisyChain();
         dc.clearRows();
         juce::Component::SafePointer<AudioPluginAudioProcessorEditor> safe(ed);
@@ -676,12 +669,10 @@ void AudioPluginAudioProcessor::clearAllNodes() {
 
 //==============================================================================
 //Entire plugin bypass functionality - Austin
-bool AudioPluginAudioProcessor::isBypassed() const
-{
+bool AudioPluginAudioProcessor::isBypassed() const {
     return bypassed;
 }
 
-void AudioPluginAudioProcessor::setBypassed(bool newState)
-{
+void AudioPluginAudioProcessor::setBypassed(bool newState) {
     bypassed = newState;
 }

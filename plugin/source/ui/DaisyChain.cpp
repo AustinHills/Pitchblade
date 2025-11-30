@@ -20,19 +20,45 @@
 
 // helper to make unique effect names when adding/duplicating
 static juce::String makeUniqueName(const juce::String& baseName, const std::vector<std::shared_ptr<EffectNode>>& nodes) {
-    int counter = 1;
-    juce::String newName = baseName;
-	// lambda to check if name exists
+    // get base name by removing any existing numbers
+    juce::String cleanBase = baseName.trim();
+
+    // find last space
+    int lastSpace = cleanBase.lastIndexOfChar(' ');
+    if (lastSpace > 0) {
+        juce::String suffix = cleanBase.substring(lastSpace + 1);
+
+        // check if suffix is a number
+        bool isNumber = true;
+        for (auto c : suffix)
+            if (!juce::CharacterFunctions::isDigit(c))
+                isNumber = false;
+
+        if (isNumber)
+            cleanBase = cleanBase.substring(0, lastSpace); // remove the number
+    }
+
+    // make unique name
+    juce::String newName = cleanBase;
+    int counter = 2;
+
+	// check if name exists
     auto nameExists = [&](const juce::String& name) {
-            for (auto& n : nodes)
-				if (n && n->effectName == name)     // check against effect names in nodes
-                    return true;
-            return false;
+        for (auto& n : nodes)
+            if (n && n->effectName == name)
+                return true;
+        return false;
         };
-	
-    while (nameExists(newName)) {
-        newName = baseName + " " + juce::String(++counter);  } // ++ until unique
-    return newName;
+
+    if (!nameExists(newName))
+        return newName;
+
+	// append numbers until unique
+    while (nameExists(cleanBase + " " + juce::String(counter)))
+        counter++;
+
+	// return unique name
+    return cleanBase + " " + juce::String(counter);
 }
 
 //convert UI rows into processor rows
@@ -44,6 +70,7 @@ static std::vector<AudioPluginAudioProcessor::Row> toProcessorRows(const std::ve
     return out;
 }
 
+// DaisyChain constructor
 DaisyChain::DaisyChain(AudioPluginAudioProcessor& proc, std::vector<std::shared_ptr<EffectNode>>& nodes) :processorRef(proc), effectNodes(nodes) {
 	// add + duplicate buttons
     addAndMakeVisible(addButton);
@@ -79,6 +106,24 @@ DaisyChain::DaisyChain(AudioPluginAudioProcessor& proc, std::vector<std::shared_
     }
 }
 
+// check if any row has a formant / pitch effect
+// only allowing one of each type in the chain. has audio bugs if multiple formant or pitch effects are present
+bool DaisyChain::hasFormant() const {
+    for (auto& r : rows) {
+        if (r.left.startsWith("Formant")) return true;
+        if (r.right.startsWith("Formant")) return true;
+    }
+    return false;
+}
+
+bool DaisyChain::hasPitch() const {
+    for (auto& r : rows) {
+        if (r.left.startsWith("Pitch")) return true;
+        if (r.right.startsWith("Pitch")) return true;
+    }
+    return false;
+}
+
 // helper to find node by name
 std::shared_ptr<EffectNode> DaisyChain::findNodeByName(const juce::String& name) const {
 	std::lock_guard<std::recursive_mutex> lg(processorRef.getMutex());    // lock for thread safety
@@ -97,6 +142,7 @@ static int toModeIdFromNode(const std::shared_ptr<EffectNode>& n) {
 //helper to find name in rows - rowIndex, isRightCell, found
 static std::tuple<int, bool, bool> findRowAndSide(const std::vector<DaisyChain::Row>& rows, const juce::String& name) {
     for (int i = 0; i < (int)rows.size(); ++i) {
+		// check left and right
         if (rows[i].left == name)  return { i, false, true };
         if (rows[i].right == name) return { i, true , true };
     }
@@ -115,7 +161,7 @@ void DaisyChain::resetRowsToNodes() {
     }
 }
 
-
+// rebuilds the UI from current rows and effectNodes
 void DaisyChain::rebuild() {
     // clear UI rows
     for (auto* it : items) effectsContainer.removeChildComponent(it);
@@ -123,9 +169,10 @@ void DaisyChain::rebuild() {
 
 	juce::Array<int> rightToClear;  // indices of rows to clear right slot if invalid
 	// will not mutate rows, just read from it to build UI
+    
 	// create rows from effectnodes effect names and chain modes /////////////////////////////////////
     for (int i = 0; i < (int)rows.size(); ++i) {
-        const auto& rowData = rows[i];  // get name from current order list
+        const auto& rowData = rows[i];                      // get name from current order list
 
 		auto* row = new DaisyChainItem(rowData.left, i);    // create row with effect name
         effectsContainer.addAndMakeVisible(row);
@@ -143,14 +190,17 @@ void DaisyChain::rebuild() {
         const bool leftBypassed = nodeLeft ? nodeLeft->bypassed : false;
         row->updateBypassVisual(leftBypassed);
 
-        // update global bypass state visually
         row->onBypassChanged = [this, name = rowData.left, row](int index, bool state) {
             // find node by name and update its bypass state
-            if (auto n = findNodeByName(name)) { 
-                n->bypassed = state; 
+            if (auto n = findNodeByName(name)) {
+                n->bypassed = state;
             }
+
             row->updateBypassVisual(state);
-         };
+            // notify editor that some bypass changed
+            if (onAnyBypassChanged)
+                onAnyBypassChanged();
+            };
 
         // find neighboring row states for ui connections 
         int leftModeId = 1;
@@ -170,11 +220,8 @@ void DaisyChain::rebuild() {
 		// set left node chain mode
         row->setChainModeId(leftModeId);
         row->updateModeVisual();    
-       /* if (auto nodeLeft = findNodeByName(rowData.left)) {
-            nodeLeft->chainMode = (ChainMode)leftModeId;
-        }*/
 
-        // Right node if present //////////////////////
+        // RIGHT node if present //////////////////////
         if (rowData.right.isNotEmpty()) {
 			auto nodeR = findNodeByName(rowData.right); // find right node by name
             if (!nodeR) { 
@@ -188,11 +235,15 @@ void DaisyChain::rebuild() {
                 row->updateSecondaryBypassVisual(nodeR->bypassed);      // update right bypass visual
                 row->onSecondaryBypassChanged = [this, name = rowData.right, row](int index, bool state) {  // right bypass callback
                     // find node by name and update its bypass state
-                    if (auto n = findNodeByName(name)) { 
-                        n->bypassed = state; 
-                    }                   
+                    if (auto n = findNodeByName(name)) {
+                        n->bypassed = state;
+                    }
                     row->updateSecondaryBypassVisual(state);     // update visual
-                };
+
+                    // notify editor that some bypass changed
+                    if (onAnyBypassChanged)
+                        onAnyBypassChanged();
+                    };
             }
 
         } else {
@@ -211,10 +262,9 @@ void DaisyChain::rebuild() {
                 }
             };
 
-            if (row->getName().isNotEmpty())     { handleMode(row->getName()); } // left
-            if (!row->rightEffectName.isEmpty()) { handleMode(row->rightEffectName); } // right
-			//processorRef.requestReorder(getCurrentOrder()); // notify processor of potential chain change
-            processorRef.requestLayout(toProcessorRows(rows));
+            if (row->getName().isNotEmpty())     { handleMode(row->getName()); }        // left
+            if (!row->rightEffectName.isEmpty()) { handleMode(row->rightEffectName); }  // right
+			processorRef.requestLayout(toProcessorRows(rows));                          // notify processor of layout change
         };
 
         row->onReorder = [this](int kind, juce::String dragName, int targetRow) { // reorder callback from drag n drop ui
@@ -237,6 +287,7 @@ void DaisyChain::rebuild() {
             rows[(size_t)idx].right.clear();
     }
 
+	// finalize
     resized();
     repaint();
 	if (globalBypassed) { setGlobalBypassVisual(true); } //  global bypass visual state
@@ -282,8 +333,7 @@ void DaisyChain::handleReorder(int kind, const juce::String& dragName, int targe
     }
 
     //  -2 create double row
-    if (kind == -2)
-    {
+    if (kind == -2) {
         // inserting into right slot of targetRow if possible
         // else create a brand new row below targetRow
         const int safeRow = juce::jlimit(0, (int)rows.size() - 1, targetRow);
@@ -310,7 +360,9 @@ void DaisyChain::handleReorder(int kind, const juce::String& dragName, int targe
         });
 }
 
+// layout the daisy chain component
 void DaisyChain::resized() {
+	// main area with padding
     auto area = getLocalBounds().reduced(4);
     area.removeFromTop(10);
     area.removeFromRight(8);
@@ -349,8 +401,9 @@ void DaisyChain::resized() {
 	const int doubleH = 86;   // double down height
     const int width = scrollArea.getWidth() - 8;
 
+    // layout each item
     int y = 0;
-    for (int i = 0; i < items.size(); ++i) { 	// layout each item
+    for (int i = 0; i < items.size(); ++i) { 	
         auto* item = items[i];
         if (!item) continue;
 
@@ -369,6 +422,7 @@ void DaisyChain::resized() {
     effectsContainer.setBounds(0, 0, scrollArea.getWidth(), y);
 }
 
+// paint the daisy chain background and arrows
 void DaisyChain::paint(juce::Graphics& g) {
     auto r = getLocalBounds().toFloat();
     juce::ColourGradient gradient(
@@ -468,7 +522,7 @@ void DaisyChain::paint(juce::Graphics& g) {
     }
 }
 
-// flatten rows to old API
+// flatten current rows into single list of effect names
 std::vector<juce::String> DaisyChain::getCurrentOrder() const {
 	std::vector<juce::String> flat; // flattened list
     for (auto& r : rows) {
@@ -478,62 +532,56 @@ std::vector<juce::String> DaisyChain::getCurrentOrder() const {
     return flat;
 }
 
-
 // grey out individual bypass when global bypassed
 void DaisyChain::setGlobalBypassVisual(bool state) {
+	// now just store the state and apply to all items
     globalBypassed = state;
+
+	// apply to all items , skip nulls
     for (auto* row : items) {
-        // LEFT
-        if (globalBypassed) {
-            // grey out
-            row->bypass.setEnabled(false);
-            row->bypass.setColour(juce::TextButton::buttonColourId, Colors::accent.withAlpha(0.5f));
-            row->bypass.setColour(juce::TextButton::buttonOnColourId, Colors::accent.withAlpha(0.5f));
-            row->bypass.setColour(juce::TextButton::textColourOffId, Colors::buttonText.withAlpha(0.5f));
-            row->bypass.setColour(juce::TextButton::textColourOnId, Colors::buttonText.withAlpha(0.5f));
-        } else {
-            // restore
-            const bool state = row->bypassed;
-            const auto bg = state ? juce::Colours::hotpink : Colors::panel;
+        if (!row) continue;
 
-            row->bypass.setEnabled(true);
-            row->bypass.setColour(juce::TextButton::buttonColourId, bg);
-            row->bypass.setColour(juce::TextButton::buttonOnColourId, juce::Colours::lightgrey);
-            row->bypass.setColour(juce::TextButton::textColourOffId, Colors::buttonText);
-            row->bypass.setColour(juce::TextButton::textColourOnId, Colors::buttonText);
-        }
-        row->bypass.repaint();
+        // left bypass
+        row->bypass.setEnabled(!state);
+        row->bypass.setAlpha(state ? 0.5f : 1.0f);
 
-        // RIGHT (if present)
+        // right bypass
         if (row->isDoubleRow) {
-            if (globalBypassed) {
-                row->rightBypass.setEnabled(false);
-                row->rightBypass.setColour(juce::TextButton::buttonColourId, Colors::accent.withAlpha(0.5f));
-                row->rightBypass.setColour(juce::TextButton::buttonOnColourId, Colors::accent.withAlpha(0.5f));
-                row->rightBypass.setColour(juce::TextButton::textColourOffId, Colors::buttonText.withAlpha(0.5f));
-                row->rightBypass.setColour(juce::TextButton::textColourOnId, Colors::buttonText.withAlpha(0.5f));
-            }
-            else {
-                const bool stateR = row->rightBypassed;
-                const auto bgR = stateR ? juce::Colours::hotpink : Colors::panel;
+            row->rightBypass.setEnabled(!state);
+            row->rightBypass.setAlpha(state ? 0.5f : 1.0f);
+        }
 
-                row->rightBypass.setEnabled(true);
-                row->rightBypass.setColour(juce::TextButton::buttonColourId, bgR);
-                row->rightBypass.setColour(juce::TextButton::buttonOnColourId, juce::Colours::lightgrey);
-                row->rightBypass.setColour(juce::TextButton::textColourOffId, Colors::buttonText);
-                row->rightBypass.setColour(juce::TextButton::textColourOnId, Colors::buttonText);
-            }
-            row->rightBypass.repaint();
+        // mode buttons
+        row->modeButton.setEnabled(!state);
+        row->modeButton.setAlpha(state ? 0.5f : 1.0f);
+
+        if (row->isDoubleRow) {
+            row->rightMode.setEnabled(!state);
+            row->rightMode.setAlpha(state ? 0.5f : 1.0f);
+        }
+
+        // open effect buttons
+        row->button.setEnabled(!state);
+        row->button.setAlpha(state ? 0.5f : 1.0f);
+
+        if (row->isDoubleRow) {
+            row->rightButton.setEnabled(!state);
+            row->rightButton.setAlpha(state ? 0.5f : 1.0f);
         }
     }
 }
 
 // enable/disable chain controls (for locking during preset/settings)
 void DaisyChain::setChainControlsEnabled(bool enabled) {
+    // stops unlocking if lockBypass is active
+    if (globalBypassed && enabled)
+        return;
+
     addButton.setEnabled(enabled);
     duplicateButton.setEnabled(enabled);
     deleteButton.setEnabled(enabled);
     
+	// enable/disable all chain item interactions
     for (auto* item : items) {
         item->setInterceptsMouseClicks(enabled, enabled);
         item->grip.setInterceptsMouseClicks(enabled, enabled);
@@ -543,6 +591,10 @@ void DaisyChain::setChainControlsEnabled(bool enabled) {
 
 // lock reordering and drag/drop when viewing settings/presets
 void DaisyChain::setReorderLocked(bool locked) {
+    // stops unlocking if lockBypass is active
+    if (globalBypassed && !locked)
+        return;
+
     reorderLocked = locked;
     
 	// store in properties
@@ -606,75 +658,107 @@ void DaisyChain::setReorderLocked(bool locked) {
 // menu to add new effect nodes
 void DaisyChain::showAddMenu() {
 	if (reorderLocked) return;  // prevent adding if locked
+
+	// check existing formant/pitch
+    const bool formantExists = hasFormant();
+    const bool pitchExists = hasPitch();
+
 	juce::PopupMenu menu;       // create menu manually add all effects
     menu.addItem(1, "Gain");
     menu.addItem(2, "Noise Gate");
     menu.addItem(3, "Compressor");
     menu.addItem(4, "De-Esser");
     menu.addItem(5, "De-Noiser");
-    menu.addItem(6, "Formant");
-    menu.addItem(7, "Pitch");
-    menu.addItem(8, "Equalizer");
+    menu.addItem(6, "Formant",  !formantExists);    // disable when one already exists
+    menu.addItem(7, "Pitch",    !pitchExists);
+    menu.addItem(8, "Equalizer");;
 
+	// set look and feel
     menu.setLookAndFeel(&getLookAndFeel());
     addButton.setColour(juce::TextButton::buttonColourId, Colors::accent);
+
+	// show menu async
     menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&addButton), [this](int result) {
         addButton.setColour(juce::TextButton::buttonColourId, Colors::button);
 
-            if (result == 0) return;
-			// create new node based on selection
-            std::shared_ptr<EffectNode> newNode;
-            switch (result) {
-            case 1: newNode = std::make_shared<GainNode>(processorRef); break;
-            case 2: newNode = std::make_shared<NoiseGateNode>(processorRef); break;
-            case 3: newNode = std::make_shared<CompressorNode>(processorRef); break;
-            case 4: newNode = std::make_shared<DeEsserNode>(processorRef); break;
-            case 5: newNode = std::make_shared<DeNoiserNode>(processorRef); break;
-            case 6: newNode = std::make_shared<FormantNode>(processorRef); break;
-            case 7: newNode = std::make_shared<PitchNode>(processorRef); break;
-            case 8: newNode = std::make_shared<EqualizerNode>(processorRef); break;
-            }
+        if (result == 0) return;
+        if (result == 6 && hasFormant()) return;
+        if (result == 7 && hasPitch()) return;
 
-			// add to processor + ui lists
-            if (newNode) {
-                newNode->effectName = makeUniqueName(newNode->effectName, effectNodes);
-				// create and attach ValueTree to APVTS
-                effectNodes.push_back(newNode);
-				//updated to use rows instead of effectNames directly
-                Row r;
-                r.left = newNode->effectName;
-                rows.push_back(r);
+        // create new node based on selection
+        std::shared_ptr<EffectNode> newNode;
+        switch (result) {
+        case 1: newNode = std::make_shared<GainNode>(processorRef); break;
+        case 2: newNode = std::make_shared<NoiseGateNode>(processorRef); break;
+        case 3: newNode = std::make_shared<CompressorNode>(processorRef); break;
+        case 4: newNode = std::make_shared<DeEsserNode>(processorRef); break;
+        case 5: newNode = std::make_shared<DeNoiserNode>(processorRef); break;
+        case 6: newNode = std::make_shared<FormantNode>(processorRef); break;
+        case 7: newNode = std::make_shared<PitchNode>(processorRef); break;
+        case 8: newNode = std::make_shared<EqualizerNode>(processorRef); break;
+        }
+        if (!newNode) return;
 
-				// rebuild the chain
-                auto oldCb = onReorderFinished;
-                onReorderFinished = nullptr;
-                rebuild();
-                onReorderFinished = oldCb;
-                processorRef.requestLayout(toProcessorRows(rows));
+        // add to processor + ui lists
+        newNode->effectName = makeUniqueName(newNode->effectName, effectNodes);
 
-                if (onReorderFinished) onReorderFinished();
-            }
+        // create and attach ValueTree to APVTS
+        effectNodes.push_back(newNode);
+
+        //updated to use rows instead of effectNames directly
+        Row r;
+        r.left = newNode->effectName;
+        rows.push_back(r);
+
+        // rebuild the chain
+        auto oldCb = onReorderFinished;
+        onReorderFinished = nullptr;
+        rebuild();
+        onReorderFinished = oldCb;
+
+		// notify processor of layout change
+        processorRef.requestLayout(toProcessorRows(rows));
+        if (onReorderFinished) onReorderFinished();
         });
 }
 
 // menu to duplicate existing effect nodes
 void DaisyChain::showDuplicateMenu() {
     if (reorderLocked) return;  // prevent adding if locked
-	juce::PopupMenu menu; // create menu with existing effect names
-	{   // lock processor mutex for thread safety
-        //std::lock_guard<std::mutex> lg(processorRef.getMutex());
-        for (int i = 0; i < effectNodes.size(); ++i) {
-            menu.addItem(i + 1, effectNodes[i]->effectName);
-        }
+
+    // check existing formant/pitch
+	const bool formantExists = hasFormant();    
+    const bool pitchExists = hasPitch();
+
+    // create menu with existing effect names
+	juce::PopupMenu menu;
+    for (int i = 0; i < effectNodes.size(); ++i) {
+        const auto& name = effectNodes[i]->effectName;
+
+		// disable if formant/pitch already exists
+        bool disable = false;
+        if (name.startsWith("Formant") && formantExists) disable = true;
+        if (name.startsWith("Pitch") && pitchExists) disable = true;
+
+        menu.addItem(i + 1, name, !disable);
     }
+    
+	// set look and feel
     menu.setLookAndFeel(&getLookAndFeel());
     duplicateButton.setColour(juce::TextButton::buttonColourId, Colors::accent);
-    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&duplicateButton), [this](int result)
-        {
+
+	// show menu async
+    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&duplicateButton), [this](int result) {
             duplicateButton.setColour(juce::TextButton::buttonColourId, Colors::button);
+
             if (result == 0) return;
             const int index = result - 1;
             if (index < 0 || index >= effectNodes.size()) return;
+
+			// check formant/pitch constraints
+            juce::String name = effectNodes[index]->effectName;
+            if (name.startsWith("Formant") && hasFormant()) return;
+            if (name.startsWith("Pitch") && hasPitch()) return;
 
             auto original = effectNodes[index];
             if (!original) return;
@@ -709,17 +793,20 @@ void DaisyChain::showDuplicateMenu() {
 // menu to delete existing effect nodes
 void DaisyChain::showDeleteMenu() {
     if (reorderLocked) return;  // prevent adding if locked
-	juce::PopupMenu menu;   // create menu with existing effect names
-    {   // lock processor mutex for thread safety
-        //std::lock_guard<std::mutex> lg(processorRef.getMutex());
+
+    // create menu with existing effect name
+	juce::PopupMenu menu; {   
         for (int i = 0; i < effectNodes.size(); ++i) {
             menu.addItem(i + 1, effectNodes[i]->effectName);
         }
     }
+
+	// set look and feel
     menu.setLookAndFeel(&getLookAndFeel());
     deleteButton.setColour(juce::TextButton::buttonColourId, Colors::accent);
-    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&deleteButton), [this](int result)
-        {
+
+	// show menu async
+    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&deleteButton), [this](int result) {
             deleteButton.setColour(juce::TextButton::buttonColourId, Colors::button);
             if (result == 0) return; // user canceled
             const int index = result - 1;

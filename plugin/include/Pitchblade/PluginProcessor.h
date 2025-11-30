@@ -1,24 +1,36 @@
+/*
+    PluginProcessor class handles all audio related logic for Pitchblade.
+
+    It creates and manages the DSP processors, owns the AudioProcessorValueTreeState,
+    builds the effect node chain, updates routing when the user changes the DaisyChain,
+    and processes audio for every block. 
+
+    It also manages preset loading and saving, layout updates, global bypass, and 
+    synchronization between the UI thread and the audio thread
+*/
+
 #pragma once
 #include <vector>
 #include <memory>
 #include <juce_audio_processors/juce_audio_processors.h>
-
-#include "Pitchblade/effects/GainProcessor.h"       //Austin
-#include "Pitchblade/effects/FormantDetector.h"     //huda
-#include "Pitchblade/effects/NoiseGateProcessor.h"  //austin
-#include "Pitchblade/effects/PitchCorrector.h"      //hayley
-#include "Pitchblade/effects/CompressorProcessor.h" //Austin
-#include "Pitchblade/effects/DeEsserProcessor.h"    //Austin
-#include "Pitchblade/effects/DeNoiserProcessor.h"   //Austin
-#include "Pitchblade/panels/EffectNode.h"           //reyna
-#include "Pitchblade/effects/FormantShifter.h"      //huda
-#include "Pitchblade/effects/Equalizer.h"           //huda
-
-class EffectNode;
+//Austin
+#include "Pitchblade/effects/GainProcessor.h"       
+#include "Pitchblade/effects/CompressorProcessor.h" 
+#include "Pitchblade/effects/DeEsserProcessor.h"    
+#include "Pitchblade/effects/DeNoiserProcessor.h"   
+#include "Pitchblade/effects/NoiseGateProcessor.h"  
+//huda
+#include "Pitchblade/effects/FormantDetector.h"     
+#include "Pitchblade/effects/FormantShifter.h"      
+#include "Pitchblade/effects/Equalizer.h"           
+//hayley
+#include "Pitchblade/effects/PitchCorrector.h"      
+//reyna
+#include "Pitchblade/panels/EffectNode.h"           
+class EffectNode;   // forward declaration for effectNode order 
 
 //==============================================================================
-class AudioPluginAudioProcessor final : public juce::AudioProcessor
-{
+class AudioPluginAudioProcessor final : public juce::AudioProcessor {
 public:
     //==============================
     AudioPluginAudioProcessor();
@@ -56,90 +68,92 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
-    //============================== global bypass
+	//============================== global bypass - reyna
     bool isBypassed() const;
     void setBypassed(bool newState);
-    //============================== stored perameters for daisy chain
-    juce::AudioProcessorValueTreeState apvts;
+
+    //============================== stored parameters for daisy chain - reyna
+	juce::AudioProcessorValueTreeState apvts;
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
-	std::vector<std::shared_ptr<EffectNode>>& getEffectNodes() { return effectNodes; }  //getter for effect nodes
-	std::recursive_mutex& getMutex() { return audioMutex; }         // getter for audio mutex
 
-    //============================== DSP processors 
+	std::vector<std::shared_ptr<EffectNode>>& getEffectNodes() { return effectNodes; }
+	std::recursive_mutex& getMutex() { return audioMutex; } 
 
+    //============================================================================== DSP processors
+
+    // austin
     GainProcessor& getGainProcessor() { return gainProcessor; }
     NoiseGateProcessor& getNoiseGateProcessor() { return noiseGateProcessor; }
-
-    FormantDetector& getFormantDetector() { return formantDetector; }
-        void setLatestFormants(const std::vector<float>& freqs) { latestFormants = freqs; }
-        const std::vector<float>& getLatestFormants() { return latestFormants; }
-
-    PitchCorrector& getPitchCorrector() { return pitchProcessor; }
     CompressorProcessor& getCompressorProcessor() { return compressorProcessor; }
-    DeEsserProcessor& getDeEsserProcessor() {return deEsserProcessor; }
-    DeNoiserProcessor& getDeNoiserProcessor() {return deNoiserProcessor; }
+    DeEsserProcessor& getDeEsserProcessor() { return deEsserProcessor; }
+    DeNoiserProcessor& getDeNoiserProcessor() { return deNoiserProcessor; }
 
-    FormantShifter& getFormantShifter() { return formantShifter; }
-    Equalizer& getEqualizer() {return equalizer; }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////// reyna 
-
-    //reyna 
-	void setRootNode(std::shared_ptr<EffectNode> node) { rootNode = std::move(node); }  // set root node for processing chain
-    
     int getCurrentBlockSize() const {return currentBlockSize;}; // Austin - Was having an issue initializing de-esser
 
-	struct Row { juce::String left, right; };               // processing chain row
-	void requestLayout(const std::vector<Row>& newRows);    // request new layout for processing chain 
-    std::vector<Row> getCurrentLayoutRows();                //getter for current layout of rows for ui 
+    // huda
+    FormantDetector& getFormantDetector() { return formantDetector; }
+    void setLatestFormants(const std::vector<float>& freqs) { latestFormants = freqs; }
+    const std::vector<float>& getLatestFormants() { return latestFormants; }
+    FormantShifter& getFormantShifter() { return formantShifter; }
+    Equalizer& getEqualizer() { return equalizer; }
+
+    //hayley
+    PitchCorrector& getPitchCorrector() { return pitchProcessor; }
+
+    //reyna 
+	// effect node chain management
+	void setRootNode(std::shared_ptr<EffectNode> node) { rootNode = std::move(node); }  // set root node for processing chain
+	struct Row { juce::String left, right; };                                           // processing chain row
+	void requestLayout(const std::vector<Row>& newRows);                                // request new layout for processing chain 
+    std::vector<Row> getCurrentLayoutRows();                                            //getter for current layout of rows for ui 
 
 	// preset management
     void savePresetToFile(const juce::File& file);
     void loadPresetFromFile(const juce::File& file);
     void loadDefaultPreset(const juce::String& type);
-    void clearAllNodes();       //for preset loading
+    void clearAllNodes();  
 
 private:
-    //============================== 
+    //============================================================================== 
     //processors
-    GainProcessor gainProcessor;            //austin
-    NoiseGateProcessor noiseGateProcessor;
-    FormantDetector formantDetector;        // To handle detection - huda
-    std::vector<float> latestFormants;      // Vector to store formants - huda
-    PitchDetector pitchDetector;
-    PitchShifter pitchShifter;
-    PitchCorrector  pitchProcessor;         // To correct pitch - hayley
-    FormantShifter formantShifter;          //huda
-    Equalizer equalizer;           //huda
-
-
-    bool bypassed = false;
-
-    int currentBlockSize = 512; // Austin
-
-    CompressorProcessor compressorProcessor; //Austin
-    DeEsserProcessor deEsserProcessor;      //Austin
-    DeNoiserProcessor deNoiserProcessor;    //Austin
     
-	// reyna    Effect nodes for the processing chain
-    std::vector<std::shared_ptr<EffectNode>> effectNodes;
-	std::shared_ptr<std::vector<std::shared_ptr<EffectNode>>> activeNodes; // copy of current active nodes for reordering
-    std::shared_ptr<EffectNode> rootNode;
+    //austin
+    GainProcessor gainProcessor;            
+    NoiseGateProcessor noiseGateProcessor;
+    CompressorProcessor compressorProcessor; 
+    DeEsserProcessor deEsserProcessor;      
+    DeNoiserProcessor deNoiserProcessor;  
+
+    int currentBlockSize = 512;
+
+    // huda
+    Equalizer equalizer;                    
+    FormantDetector formantDetector;        // To handle detection
+    std::vector<float> latestFormants;      // Vector to store formants 
+    FormantShifter formantShifter;   
+
+    //hayley                
+    PitchDetector pitchDetector;            
+    PitchShifter pitchShifter;
+    PitchCorrector  pitchProcessor;         // To correct pitch
+
+	// reyna 
+    // global bypass
+    bool bypassed = false;
+    
+	// effect nodes for the processing chain
+	std::vector<std::shared_ptr<EffectNode>> effectNodes;                   // all available effect nodes
+	std::shared_ptr<std::vector<std::shared_ptr<EffectNode>>> activeNodes;  // copy of current active nodes for reordering
+	std::shared_ptr<EffectNode> rootNode;                                   // root node of chain for processing
 
     //reorder queue
-	//std::mutex audioMutex;    
 	std::recursive_mutex audioMutex;                    // mutex for audio thread safety
 	std::atomic<bool> reorderRequested{ false };        // flag for reorder request
 
 	//layout  rows
-	std::vector<Row> pendingRows;   // new layout to apply
-    std::atomic<bool> layoutRequested{ false };
+	std::vector<Row> pendingRows;                   // new layout to apply
+	std::atomic<bool> layoutRequested{ false };     // flag for layout request
     void applyPendingLayout();
-
-    //removed to simplify code, stop using single list entirely, only use rows
-    //std::vector<juce::String> pendingOrderNames;        // new order to apply
-    //void applyPendingReorder();
-    //void requestReorder(const std::vector<juce::String>& newOrderNames);    // reorder using effect names
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioPluginAudioProcessor)
 };

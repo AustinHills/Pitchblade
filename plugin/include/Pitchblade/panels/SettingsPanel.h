@@ -1,4 +1,14 @@
 //Austin Hills
+/*
+    The SettingsPanel class provides the plugin's global configuration controls.
+    It displays UI elements that affect the plugin as a whole rather than any
+    single effect, such as the global graph framerate. 
+    
+    The panel connects its controls directly to parameters in the 
+    AudioProcessorValueTreeState so settings remain stored and recalled with presets.
+
+    The SettingsPanel does not manage DSP or routing. 
+*/
 
 #pragma once
 #include <JuceHeader.h>
@@ -25,6 +35,5 @@ public:
     ~SettingsPanel() override;
 
     void paint(juce::Graphics& g) override;
-
     void resized() override;
 };

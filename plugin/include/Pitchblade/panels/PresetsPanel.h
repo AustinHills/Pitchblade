@@ -1,4 +1,19 @@
 //reyna
+/*
+    The PresetsPanel class manages loading, saving, and browsing presets for
+    Pitchblade.
+
+    It provides a dedicated UI where users can save the current effect chain
+    layout, load existing presets from disk, and view preset metadata. The
+    panel communicates with the processor to serialize all node states, global
+    parameters, and layout information.
+
+    The PresetsPanel does not modify DSP directly. It only triggers preset
+    save or load actions and tells the PluginEditor to rebuild the UI after
+    preset changes
+*/
+
+
 #pragma once
 #include <JuceHeader.h>
 #include "Pitchblade/ui/ColorPalette.h"

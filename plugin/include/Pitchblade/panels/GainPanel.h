@@ -10,7 +10,7 @@ public:
     explicit GainPanel(AudioPluginAudioProcessor& proc);
 
 	// overloaded constructor with local state
-    GainPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& state);
+    GainPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& state, const juce::String& nodeTitle);
 
 	// destructor
     ~GainPanel() override;
@@ -20,6 +20,7 @@ public:
 
     void resized() override;
     void paint(juce::Graphics&) override; 
+    juce::String panelTitle;
 
 private:
     //declaring slider n processor
@@ -92,7 +93,7 @@ public:
 
     // return UI panel linked to node
     std::unique_ptr<juce::Component> createPanel(AudioPluginAudioProcessor& proc) override {
-		return std::make_unique<GainPanel>(proc, getMutableNodeState()); // pass local state
+		return std::make_unique<GainPanel>(proc, getMutableNodeState(), effectName); // pass local state
     }
 
     // return visualizer 

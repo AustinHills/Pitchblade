@@ -10,11 +10,12 @@
 class DeEsserPanel : public juce::Component, public juce::ValueTree::Listener
 {
 public:
-    explicit DeEsserPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& state);
+    explicit DeEsserPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& state, const juce::String& nodeTitle);
     ~DeEsserPanel() override;
 
     void resized() override;
     void paint(juce::Graphics&) override;
+    juce::String panelTitle;
 
     void valueTreePropertyChanged(juce::ValueTree& tree, const juce::Identifier& property) override;
 
@@ -123,7 +124,7 @@ public:
     //return UI panel linked to node
     std::unique_ptr<juce::Component> createPanel(AudioPluginAudioProcessor& proc) override
     {
-        return std::make_unique<DeEsserPanel>(proc, getMutableNodeState());
+        return std::make_unique<DeEsserPanel>(proc, getMutableNodeState(), effectName);
     }
 
     std::unique_ptr<juce::Component> createVisualizer(AudioPluginAudioProcessor& proc) override{

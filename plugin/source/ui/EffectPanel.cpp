@@ -7,9 +7,8 @@
 #include "Pitchblade/panels/EffectNode.h"
 
 //effects panel section
-EffectPanel::EffectPanel(AudioPluginAudioProcessor& proc, const std::vector<std::shared_ptr<EffectNode>>& nodes)    //const read only reference to vector
-    : processor(proc), effectNodes(nodes)
-{
+EffectPanel::EffectPanel(AudioPluginAudioProcessor& proc, const std::vector<std::shared_ptr<EffectNode>>& nodes)
+                                                                            : processor(proc), effectNodes(nodes) {
     refreshTabs();
 
     //hide top tab buttons
@@ -19,19 +18,17 @@ EffectPanel::EffectPanel(AudioPluginAudioProcessor& proc, const std::vector<std:
     addAndMakeVisible(tabs);
 }
 
-void EffectPanel::resized()
-{
+void EffectPanel::resized() {
     //get bounds of panel and sets
     tabs.setBounds(getLocalBounds());
 }
 
-void EffectPanel::showEffect(int index)
-{
+void EffectPanel::showEffect(int index) {
     //switches current tab
     tabs.setCurrentTabIndex(index);
 }
 
-
+// paint effect panel with gradient
 void EffectPanel::paint(juce::Graphics& g) {
     auto r = getLocalBounds().toFloat();
 
@@ -54,8 +51,8 @@ void EffectPanel::paint(juce::Graphics& g) {
 
 }
 
-void EffectPanel::refreshTabs()
-{
+// rebuild tabs when effects are added/removed
+void EffectPanel::refreshTabs() {
     std::lock_guard<std::recursive_mutex> lock(processor.getMutex());
     //rebuilds tabs based on gobal effects list
     effectNodes = processor.getEffectNodes();

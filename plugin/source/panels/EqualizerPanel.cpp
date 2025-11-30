@@ -6,9 +6,8 @@
 #include "Pitchblade/ui/CustomLookAndFeel.h"
 
 // ===================== EqualizerPanel =====================
-EqualizerPanel::EqualizerPanel (AudioPluginAudioProcessor& proc, juce::ValueTree& state)
-    : processor(proc), localState(state)
-{
+EqualizerPanel::EqualizerPanel (AudioPluginAudioProcessor& proc, juce::ValueTree& state, const juce::String& nodeTitle)
+    : processor(proc), localState(state), panelTitle(nodeTitle) {
     //label names for dials - reyna
     lowFreq.setName("Low Freq");
     lowGain.setName("Low Gain");
@@ -35,9 +34,9 @@ EqualizerPanel::EqualizerPanel (AudioPluginAudioProcessor& proc, juce::ValueTree
     highGain.setValue(getProp("HighGain", 0.0f), juce::dontSendNotification);
 
     //panel label
-    panelTitle.setText("Equalizer", juce::dontSendNotification);
-    panelTitle.setName("NodeTitle"); 
-    addAndMakeVisible(panelTitle);
+    equalizerLabel.setText(panelTitle, juce::dontSendNotification);
+    equalizerLabel.setName("NodeTitle");
+    addAndMakeVisible(equalizerLabel);
 
     // make small dials for bottom row - reyna
     static SmallDialLookAndFeel smallDialLF;
@@ -88,7 +87,7 @@ EqualizerPanel::EqualizerPanel (AudioPluginAudioProcessor& proc, juce::ValueTree
 void EqualizerPanel::resized()
 {
     auto area = getLocalBounds();
-    panelTitle.setBounds(area.removeFromTop(30));
+    equalizerLabel.setBounds(area.removeFromTop(30));
 
     auto r = getLocalBounds().reduced (60,3); // (side,top/bot)
 

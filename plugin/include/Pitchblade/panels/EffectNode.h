@@ -1,5 +1,19 @@
 ﻿// reyna 
-// replacing effectRegistry.h's vectors with node based decorator pattern
+/*
+    The EffectNode class is the base object for every effect in the Pitchblade
+    chain.
+
+    It stores the ValueTree state for the effect, owns the effect's routing
+    connections, and defines how audio flows through the chain. EffectNode
+    forwards processed audio to its children based on the current mode
+
+    Each node provides its own DSP process function, creates its own UI panel
+    and visualizer, and can serialize and load its parameters through XML.
+
+    EffectNode also tracks bypass state, manages parent and child links,
+    merges audio from parents when needed, and exposes cloning functions so
+    nodes can be duplicated inside the DaisyChain.
+*/
 
 #pragma once
 #include <JuceHeader.h>
@@ -7,7 +21,7 @@
 #include <memory>
 #include <vector>
 
-//define group of named integer constants > for chain modes
+// chaining modes 
 enum class ChainMode {
     Down = 1,
     Split = 2,
@@ -15,12 +29,13 @@ enum class ChainMode {
     Unite = 4
 };
 
-class AudioPluginAudioProcessor;
+class AudioPluginAudioProcessor;    // forward declaration
 
 //base class for all effects in daisychain
 // nodes defined in each individual effectPanel.h 
 class EffectNode : public std::enable_shared_from_this<EffectNode>, public juce::Component, private juce::ValueTree::Listener {
 public:
+
 	// constructor for new node
     EffectNode(AudioPluginAudioProcessor& proc, const juce::String& type, const juce::String& displayName) : processor(proc),
                                                                             nodeType(type), effectName(displayName), nodeState(juce::ValueTree(juce::Identifier(type))) {
@@ -37,25 +52,25 @@ public:
 		nodeState.addListener(this);  
     }
 
-    ~EffectNode() override { nodeState.removeListener(this); }                                          // destructor
+    ~EffectNode() override { nodeState.removeListener(this); }   // destructor
 
     // processing functions > connect to outputs based on chain mode
     virtual void process(AudioPluginAudioProcessor& proc,juce::AudioBuffer<float>& buffer) = 0;         // process the incoming buffer 
     void processAndForward(AudioPluginAudioProcessor& proc, juce::AudioBuffer<float>& buffer);
     void mergeParentBuffers(AudioPluginAudioProcessor& proc, juce::AudioBuffer<float>& buffer);
 
-     virtual std::unique_ptr<juce::Component> createPanel(AudioPluginAudioProcessor& proc) = 0;         // ui panel creation 
+    virtual std::unique_ptr<juce::Component> createPanel(AudioPluginAudioProcessor& proc) = 0;         // ui panel creation 
 
-	 virtual std::unique_ptr<juce::Component> createVisualizer(AudioPluginAudioProcessor& proc) {       //visualizer creation
+	virtual std::unique_ptr<juce::Component> createVisualizer(AudioPluginAudioProcessor& proc) {       //visualizer creation
          juce::ignoreUnused(proc);
          return nullptr; 
-     }
+    }
 
-	 virtual std::shared_ptr<EffectNode> clone() const = 0;      // duplicate node
+	virtual std::shared_ptr<EffectNode> clone() const = 0;      // duplicate node
 
-     // XML serialization
-     virtual std::unique_ptr<juce::XmlElement> toXml() const = 0;
-     virtual void loadFromXml(const juce::XmlElement& xml) = 0;
+    // XML serialization
+    virtual std::unique_ptr<juce::XmlElement> toXml() const = 0;
+    virtual void loadFromXml(const juce::XmlElement& xml) = 0;
 
     ///////////////////////////// Accessors
 
@@ -67,7 +82,7 @@ public:
 	juce::ValueTree& getNodeStateRef() { return nodeState; }                // reference to state of node
 	const juce::String& getNodeTypeConst() const { return nodeType; }       // const type of node
 
-
+	// display name
     void setDisplayName(const juce::String& newName) {
         effectName = newName;
         nodeState.setProperty("name", effectName, nullptr);
@@ -84,22 +99,22 @@ public:
     
     // allows multiple outputs
     void connectTo(std::shared_ptr<EffectNode> next) {
-        if (!next || next.get() == this) {
-            return;
-        }
+		// avoid self-connection and null
+        if (!next || next.get() == this) { return; }
 
-		if (std::find(children.begin(), children.end(), next) == children.end()) {  // avoid duplicates
+		// avoid duplicate child links
+		if (std::find(children.begin(), children.end(), next) == children.end()) { 
             children.push_back(next);
         }
 		std::shared_ptr<EffectNode> self;   // shared ptr to this
 
-        try {
-            // only safe if shared_from_this() is valid
+        try {   // only safe if shared_from_this() is valid
             self = shared_from_this();
         } catch (const std::bad_weak_ptr&) {
             juce::Logger::outputDebugString(" connectTo(): error for " + effectName);
             return;
         } 
+
         // avoid duplicate parent links
         auto alreadyParent = std::any_of(next->parents.begin(), next->parents.end(),
 			[&](const std::weak_ptr<EffectNode>& w) {   // check if this is already a parent
@@ -148,10 +163,9 @@ inline void EffectNode::processAndForward(AudioPluginAudioProcessor& proc, juce:
     }
 
     //  chain mode rout behavior
-    switch (chainMode)
-    {
-	case ChainMode::Down:   // Single output
-    {
+    switch (chainMode) {
+	case ChainMode::Down:   
+    { // Single output
 		if (!children.empty() && children.front()) {    
             children.front()->processAndForward(proc, temp);    // process first child
 			buffer.makeCopyOf(temp, true);          // output processed buffer
@@ -161,8 +175,8 @@ inline void EffectNode::processAndForward(AudioPluginAudioProcessor& proc, juce:
         break;
     }
 
-	case ChainMode::Split:  //  Multiple outputs
-    {
+	case ChainMode::Split: 
+    { //  Multiple outputs
 		if (children.empty()) {             // if no children
 			buffer.makeCopyOf(temp, true);  // output processed buffer
             break;
@@ -192,8 +206,8 @@ inline void EffectNode::processAndForward(AudioPluginAudioProcessor& proc, juce:
         break;
     }
 
-	case ChainMode::DoubleDown: // Two outputs summed
-    {
+	case ChainMode::DoubleDown:
+    { // Two outputs summed
 		if (children.size() >= 2 && children[0] && children[1]) {   // need two valid children
 			juce::AudioBuffer<float> a(temp), b(temp);  // buffers for each branch
 			a.makeCopyOf(temp, true);           // copy inputs 
@@ -217,8 +231,8 @@ inline void EffectNode::processAndForward(AudioPluginAudioProcessor& proc, juce:
         break;
     }
 
-	case ChainMode::Unite:  // single output merged from all children
-    {
+	case ChainMode::Unite: 
+    { // single output merged from all children
         // nothing to unite, behave as down
         if (parents.empty()) {             
             if (!children.empty() && children.front()) {
@@ -280,9 +294,11 @@ inline void EffectNode::processAndForward(AudioPluginAudioProcessor& proc, juce:
 
 // merges audio buffers from all parents into the provided buffer
 inline void EffectNode::mergeParentBuffers(AudioPluginAudioProcessor& proc, juce::AudioBuffer<float>& buffer) {
+	// clear output buffer
     if (parents.empty())
         return;
 
+	//  prepare for merging
     const int numChannels = buffer.getNumChannels();
     const int numSamples = buffer.getNumSamples();
 

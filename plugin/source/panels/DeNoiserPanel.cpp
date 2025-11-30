@@ -7,10 +7,11 @@
 #include "Pitchblade/ui/CustomLookAndFeel.h"
 #include "BinaryData.h"
 
-DeNoiserPanel::DeNoiserPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& state) : processor(proc), localState(state){
+DeNoiserPanel::DeNoiserPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& state, const juce::String& nodeTitle)
+                : processor(proc), localState(state), panelTitle(nodeTitle) {
 
     //Label
-    deNoiserLabel.setText("De-Noiser", juce::dontSendNotification);
+    deNoiserLabel.setText(panelTitle, juce::dontSendNotification);
     addAndMakeVisible(deNoiserLabel);
     deNoiserLabel.setName("NodeTitle");
 
