@@ -31,5 +31,5 @@ Section "Install"
     # 7. This is the command that packages your built plugin
     # It finds the file (relative to this script) and adds it
     # to the installer .exe.
-    File /r "build\plugin\Pitchblade_artefacts\Debug\VST3\Pitchblade.vst3\Contents\x86_64-win\Pitchblade.vst3"
+    File /r "build\plugin\Pitchblade_artefacts\Release\VST3\Pitchblade.vst3"
 SectionEnd
