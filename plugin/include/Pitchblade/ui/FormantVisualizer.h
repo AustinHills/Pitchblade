@@ -6,9 +6,16 @@
 #include "Pitchblade/ui/ColorPalette.h"
 #include "Pitchblade/ui/FrequencyGraphVisualizer.h"
 
-//Author: huda
-// Visualizes detected formant frequencies as vertical markers over a log-frequency axis.
-// Pulls latest formants from the processor and repaints at the global framerate.
+/*
+==============================================================================
+    FormantVisualizer
+    Visualizes detected formant frequencies as vertical markers over a log-frequency axis.
+    Pulls latest formants from the processor and repaints at the global framerate.
+
+    Author: Huda Noor
+==============================================================================
+*/
+
 class FormantVisualizer : public juce::Component,
                           private juce::Timer,
                           private juce::AudioProcessorValueTreeState::Listener

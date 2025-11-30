@@ -15,7 +15,13 @@ void FormantVisualizer::FormantOverlay::paint(juce::Graphics& g)
     // without modifying it: paint over the left strip and bottom strip.
     g.setColour(Colors::panel);
     g.fillRect(juce::Rectangle<int>(bounds.getX(), bounds.getY(), labelWidth, bounds.getHeight() - labelHeight));
-    g.fillRect(juce::Rectangle<int>(bounds.getX(), bounds.getBottom() - labelHeight, bounds.getWidth(), labelHeight));
+    // cover the FrequencyGraphVisualizer x-axis area (accounting for its internal padding)
+    const int freqGraphPad = 15; // padding used inside FrequencyGraphVisualizer
+    auto fgBounds = bounds.reduced(freqGraphPad);
+    auto fgXLabels = fgBounds.removeFromBottom(labelHeight);
+    const int coverY = std::max(bounds.getY(), fgXLabels.getY() - 6); // extend a few px upward to hide its border
+    const int coverHeight = bounds.getBottom() - coverY;
+    g.fillRect(juce::Rectangle<int>(bounds.getX(), coverY, bounds.getWidth(), coverHeight));
 
     // Compute an inner drawing area to avoid edge clipping and visually center content
     const int padX = 8;           // horizontal padding to keep lines off the border
