@@ -60,32 +60,58 @@
  {
     this->sampleRate = sampleRate;
     circularFrame.assign(windowSize, 0.0f);
+    circularBuffer.assign(windowSize, 0.0f);
     r.assign(yinBufferSize + 1, 0.0f);
+    yinBuffer.assign(yinBufferSize + 1, 0.0f);
+    windowFunction.assign(windowSize, 0.0f);
 
-    // Initialize circular buffer of size windowSize with empty floats
-    for(int i = 0; i < windowSize; ++i)
-        circularBuffer.push_back(0.0f);
     circularIdx = 0;
-    
-    // Initialize YIN buffer with all zeroes
-    for(int i = 0; i < yinBufferSize; ++i)
-        yinBuffer.push_back(0.0f);
+
+    // Allocate memory for Viterbi processing
+    int maxCandidates = yinBufferSize / 2;  // Local minima cannot be greater than half buffer size
+    previousCandidates.reserve(maxCandidates);
+    currentCandidates.reserve(maxCandidates);
 
     // Set hop size to fraction of window size. Set higher for more resolution, lower for better CPU
     hopSize = windowSize / hopSizeDenominator;
     samplesUntilHop = hopSize;                    // Initialize hops to start at highest and count down
 
-    // Initialize Hann window
-    for(int i = 0; i < windowSize; ++i)
-        windowFunction.push_back(0.0f);
-        
     // Define Hann window
     for (int i = 0; i < windowSize; ++i) {
         windowFunction[i] = 0.5f * (1.0f - std::cos(2.0f * juce::MathConstants<float>::pi * i / (windowSize - 1)));
     }
 
+    // Prepare FFT
+    prepareFFT(windowSize);
+
     // Clear last group of pitch candidates, room for new ones
-    pitchCandidates.clear();
+    previousCandidates.clear();
+    currentCandidates.clear();
+ }
+
+
+ /**
+  * @brief FFT preparation handler for difference function
+  * @param windowSize
+  * @details Initialize FFT buffer to handle
+  * autocorrelation and energy terms. 
+  * d(tau) = sum(x_(j)^2) + sum(x_(j+tau)^2) - 2 * sum(x_j * x_(j + tau))
+  * where    ^^ energy terms                    ^^ autocorrelation
+  */
+ void PitchDetector::prepareFFT(int windowSize){
+    // Determine magnitude to multiple 2^n size
+    int magnitude = 0;
+    int fftsize = windowSize * 2;
+    while((1 << magnitude) < fftsize) magnitude++;
+
+    // Construct FFT with magnitude
+    forwardFFT = std::make_unique<juce::dsp::FFT>(magnitude);
+
+    // Create fft workspace buffer that's twice as big as that
+    fftTemp.resize(forwardFFT->getSize() * 2);
+
+    // Cumulative square holds energy term calculations
+    cumulativeSquare.resize(windowSize + 1);
  }
 
 /**
@@ -113,7 +139,7 @@ void PitchDetector::processBlock(const juce::AudioBuffer<float> &buffer)
             int startIndex = (circularIdx - windowSize + windowSize) % windowSize;
             for (int i = 0; i < windowSize; ++i) {
                 int index = (startIndex + i) % windowSize;
-                circularFrame[i] = circularBuffer[index]; // * windowFunction[i];
+                circularFrame[i] = circularBuffer[index] * windowFunction[i];
             }
 
             // Pass to processor to calculate pYIN
@@ -151,37 +177,64 @@ void PitchDetector::processBlock(const juce::AudioBuffer<float> &buffer)
  /**
   * @brief Apply difference function from YIN algorithm
   * @param frame Individual frame of raw audio data with windowing function applied
-  * @details O(N^2) loop to determine difference in time domain. 
+  * @details O(NlogN) loop to determine difference in frequency domain. 
   * Overlaps frequency with itself to find lowest possible difference between the same points
   * This should return the ideal waveform change
   */
  void PitchDetector::difference(const std::vector<float>& frame)
  {
-    // ACF at lag 0
-    float sumSquares = 0.0f;
-    for(int i = 0; i < windowSize; ++i){
-        sumSquares += frame[i] * frame[i];  //from ACF = sum_{j=t+1}^{t+W}(x_j*x_{j+\tau})
+    // 1. Calculate energy terms
+    // sum(x^2) for every value in frame
+    cumulativeSquare[0] = 0.0f;
+    for(unsigned int i = 0; i < windowSize; ++i)
+        cumulativeSquare[i+1] = cumulativeSquare[i] + (frame[i] * frame[i]);
+    
+    // 2. Calculate autocorrelation with FFT
+    // 2 * sum(x_j * x_(j + tau))
+    // Fill buffer and pad with zeroes
+    int fftSize = forwardFFT->getSize();
+    std::fill(fftTemp.begin(), fftTemp.end(), 0.0f);
+    std::copy(frame.begin(), frame.end(), fftTemp.begin());
+
+    // Forward transform Time->Frequency
+    forwardFFT->performRealOnlyForwardTransform(fftTemp.data());
+
+    // Compute power spectral density
+    // Multiply complex number by its conjugate
+    for(unsigned int i = 0; i < fftSize; ++i){
+        // Extract info from Juce automatic transform
+        float real = fftTemp[i * 2];
+        float imaginary = fftTemp[i * 2 + 1];
+
+        // Complex multiplication foil (a+bi)(a-bi) = a^2+b^2
+        float power = real * real + imaginary * imaginary;
+        
+        fftTemp[i * 2] = power;
+        fftTemp[i * 2 + 1] = 0.0f;
     }
 
-    // Running sum
-    r[0] = sumSquares;
+    // Inverse transform Frequency->Time
+    forwardFFT->performRealOnlyInverseTransform(fftTemp.data());
 
-    // from DF(tau) = r_{\tau}(0) + r_{t + \tau}(0) - 2r_t(\tau)
-    for(int tau = 1; tau < yinBufferSize; ++tau){
-        // Calculate ACF sum for this lag
-        float acf = 0.0f;
-        for(int j = 0; j < windowSize - tau; ++j){
-            acf += frame[j] * frame[j + tau]; //from ACF = sum_{j=t+1}^{t+W}(x_j*x_{j+\tau})
-        }
+    // Combine terms according to YIN formula
+    // d(tau) = energy(a) + energy(b) - 2*acf(tau)
+    for(int tau = 0; tau < yinBufferSize; ++tau){
+        // energy(a) = sum(x_j^2) from j=0 to W - 1 - tau
+        // using cumulative sum: last - first
+        float energyA = cumulativeSquare[windowSize - tau] - cumulativeSquare[0];
 
-        // Running sum: lag for prev, but delete oldest sample and add newest
-        r[tau] = r[tau - 1] 
-                - (frame[tau - 1] * frame[tau - 1]);
+        // energy(b) = sum(x_(j + tau) ^2)
+        // so, sum from tau to W
+        float energyB = cumulativeSquare[windowSize] - cumulativeSquare[tau];
 
-        // DF
-        yinBuffer[tau] = r[0] + r[tau] - 2 * acf;
+        // acf(tau) is inverse fft result
+        float acf = fftTemp[tau];
+
+        yinBuffer[tau] = energyA + energyB - 2 * acf;
     }
-    yinBuffer[0] = 1.0f; // Avoid div by 0
+
+    // Quick check to handle null value at lag 0
+    yinBuffer[0] = 1.0f; // this gets normalized out
  }
 
  /**
@@ -235,18 +288,18 @@ void PitchDetector::processBlock(const juce::AudioBuffer<float> &buffer)
   */
  std::vector<std::pair<int, float>> PitchDetector::findPitchCandidates()
  {
-    std::vector<std::pair<int, float>> pitchCandidates;
-    
+    rawCandidates.clear();
+
     // Find all local minima below threshold
     for(int tau = 2; tau < yinBufferSize-1; ++tau){
         // If it is a local minimum, it is a candidate
         if(yinBuffer[tau] < yinBuffer[tau-1] && yinBuffer[tau] < yinBuffer[tau+1]){
-            pitchCandidates.emplace_back(tau, yinBuffer[tau]);
+            rawCandidates.emplace_back(tau, yinBuffer[tau]);
         }
     }
 
     // Fallback for silence: find global min
-    if(pitchCandidates.empty()){
+    if(rawCandidates.empty()){
         float minVal = std::numeric_limits<float>::max();
         int minTau = -1;
         for (int tau = 2; tau < yinBufferSize - 1; ++tau) {
@@ -255,10 +308,10 @@ void PitchDetector::processBlock(const juce::AudioBuffer<float> &buffer)
                 minTau = tau;
             }
         }
-        if (minTau > 0) pitchCandidates.emplace_back(minTau, minVal);
+        if (minTau > 0) rawCandidates.emplace_back(minTau, minVal);
     }
 
-    return pitchCandidates;
+    return rawCandidates;
  }
 
  /**
@@ -271,11 +324,13 @@ void PitchDetector::processBlock(const juce::AudioBuffer<float> &buffer)
   */
  float PitchDetector::processViterbi(std::vector<std::pair<int, float>>& rawCandidates)
  {
-    std::vector<PitchCandidate> currentCandidates;  
+    currentCandidates.clear(); 
 
     //1. use parabolic interpolation to get pitch-probability-cost objects for each candidate
     for(auto&p : rawCandidates){
-        PitchCandidate c;
+        // quickly construct pitch candidate    
+        currentCandidates.emplace_back();
+        auto& c = currentCandidates.back();
 
         //parabolic interpolation
         float parabolicLag = parabolicMinimum(p.first);
@@ -286,7 +341,6 @@ void PitchDetector::processBlock(const juce::AudioBuffer<float> &buffer)
         if(c.probability < 0) c.probability = 0;
 
         c.cost = 0.0f;
-        currentCandidates.push_back(c);
     }
 
     //safeguard against white noise
@@ -337,12 +391,12 @@ void PitchDetector::processBlock(const juce::AudioBuffer<float> &buffer)
         }
     }
 
-    //4. Update state
-    previousCandidates = currentCandidates;
+    //4. Update state by changing name of buffer and treating prev as current
+    std::swap(previousCandidates, currentCandidates);
 
     //5. Return ideal pitch + gate to cut the transients
-    if(currentCandidates[bestCandidate_x].probability < voiceThreshold) return 0.f;
-    return currentCandidates[bestCandidate_x].pitch;
+    if(previousCandidates[bestCandidate_x].probability < voiceThreshold) return 0.f;
+    return previousCandidates[bestCandidate_x].pitch;
  }
 
  /**
