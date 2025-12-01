@@ -19,13 +19,21 @@
     - renders the UI controls and state wiring for the Formant node.
     - It binds a shift slider (-50..50) and dry/wet mix slider to the node's ValueTree
     - reflects external state changes back into the controls, and exposes the sliders 
-    for integration tests that verify APVTS wiring. FormantNode owns the DSP/mixing and
-    supplies this panel and its visualizer.
+    for integration tests that verify APVTS wiring. 
 
     Author: Huda Noor
+
+  *********************************************************
+  
+    FormantNode
+    - owns the DSP/mixing and
+    supplies this panel and its visualizer.
+
+    Author:Reyna Macabebe
 ==============================================================================
 */
 
+/*=======================Panel (UI) Author: Huda ========================*/
 class FormantPanel : public juce::Component, public juce::ValueTree::Listener {
 public:
     FormantPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& state);
@@ -55,11 +63,14 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(FormantPanel)
 };
 
-////////////////////////////////////////////////////////////
-
-// reynas changes > added dsp node defn to ui panel creation
-// formant dsp node , processes audio + makes own panel
-// inherits from EffectNode base class
+/*
+==============================================================================
+    Reynas changes
+    - added dsp node defn to ui panel creation
+    - formant dsp node , processes audio + makes own panel
+    - inherits from EffectNode base class
+==============================================================================
+*/
 class FormantNode : public EffectNode {
 public:
     FormantNode (AudioPluginAudioProcessor& proc) : EffectNode (proc, "FormantNode", "Formant"), processor (proc) {

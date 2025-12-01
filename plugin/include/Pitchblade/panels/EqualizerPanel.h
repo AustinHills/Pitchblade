@@ -1,20 +1,37 @@
 #pragma once
-// Author: huda
-// reyna updated to new valuetree value system and nodebased system
 #include <JuceHeader.h>
 #include "Pitchblade/PluginProcessor.h"
 #include "Pitchblade/panels/EffectNode.h"
-// Visualizer lives separately (VisualizerPanel tabs)
 #include "Pitchblade/ui/EqualizerVisualizer.h"
 
-// ===================== Panel (UI) =====================
+/*
+==============================================================================
+    EqualizerPanel 
+    - hosts six knobs (low/mid/high freq + gain) bound to the node's
+    ValueTree state and thread-safe EQ setters, handling UI layout and state sync.
+
+    Author: Huda Noor
+
+   ************************************************************************** 
+   
+    EqualizerNode
+    - wires this panel into the node system and provides the visualizer.
+
+    Author: Reyna Macabebe
+==============================================================================
+*/
+
+// ===================== Panel (UI) Author: Huda =====================
 class EqualizerPanel : public juce::Component, public juce::ValueTree::Listener {
 public:
     //explicit EqualizerPanel (AudioPluginAudioProcessor& proc);
+    // Build knob-only EQ panel and bind to the node's ValueTree state
     EqualizerPanel(AudioPluginAudioProcessor& p, juce::ValueTree& state, const juce::String& nodeTitle);
 
     // display panel
+    // Draw simple outline and title
     void paint(juce::Graphics& g) override;
+    // Layout six knobs and labels across two rows
     void resized() override;
     juce::String panelTitle;
 
@@ -41,6 +58,14 @@ private:
     void valueTreePropertyChanged(juce::ValueTree& tree, const juce::Identifier& property) override;
 };
 
+/*
+======================================================================================
+    Reynas changes
+    - EqualizerNode owns the EQ DSP hookup, ValueTree state, panel creation, visualizer,
+    cloning, and preset serialization for the EQ effect within the node-based chain
+    - inherits from EffectNode base class
+======================================================================================
+*/
 class EqualizerNode : public EffectNode
 {
 public:
@@ -82,12 +107,13 @@ public:
     // keep existing DSP path 
     // push local state into the DSP and process
    void process(AudioPluginAudioProcessor& proc, juce::AudioBuffer<float>& buffer) override {
+    // Apply EQ using current parameters (already updated via UI setters)
     // Do not read ValueTree properties on the audio thread (not thread-safe).
     // The UI updates the Equalizer parameters via thread-safe setters when knobs move.
     proc.getEqualizer().processBlock(buffer);
 }
 
-    //reynas daisychain and presets stuff /////////////////////////////////////////
+    //reynas daisychain and presets changes /////////////////////////////////////////
 
     // clone
     std::shared_ptr<EffectNode> clone() const override {

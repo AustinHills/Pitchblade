@@ -1,11 +1,11 @@
 // EQ response visualizer using FrequencyGraphVisualizer
-
 #include "Pitchblade/ui/EqualizerVisualizer.h"
 #include "Pitchblade/effects/Equalizer.h"
 
 EqualizerVisualizer::EqualizerVisualizer(AudioPluginAudioProcessor& proc)
     : processor(proc)
 {
+    // Set up graph and overlays, then seed the response curve
     // Use displayMode 1 to draw a horizontal 0 dB line and a vertical band marker
     // FrequencyGraphVisualizer y-axis is fixed to [-100, 0] dB.
     graph = std::make_unique<FrequencyGraphVisualizer>(processor.apvts, 5, 1);
@@ -31,11 +31,13 @@ EqualizerVisualizer::EqualizerVisualizer(AudioPluginAudioProcessor& proc)
 
 EqualizerVisualizer::~EqualizerVisualizer()
 {
+    // Stop timer to avoid callbacks after destruction
     stopTimer();
 }
 
 void EqualizerVisualizer::resized()
 {
+    // Keep overlay aligned with the underlying graph
     if (graph)
         graph->setBounds(getLocalBounds());
     if (yLabels)
@@ -51,6 +53,7 @@ void EqualizerVisualizer::forceUpdateForTest()
 
 std::vector<juce::Point<float>> EqualizerVisualizer::getLastResponsePoints() const
 {
+    // Return a thread-safe copy of the most recent response curve
     const juce::ScopedLock sl(responseLock);
     return lastResponse;
 }
@@ -64,6 +67,7 @@ void EqualizerVisualizer::timerCallback()
 
 void EqualizerVisualizer::buildLogFrequencies(std::vector<float>& freqs, int numPoints)
 {
+    // Fill vector with log-spaced frequencies across the audible band
     freqs.clear();
     freqs.reserve((size_t)numPoints);
     const float fStart = 20.0f;
@@ -139,7 +143,7 @@ void EqualizerVisualizer::paint(juce::Graphics& g)
     // no-op; child components handle all painting
 }
 
-// ----------------- Y-axis overlay -----------------
+// ======= Y-axis overlay =======
 void EqualizerVisualizer::YAxisLabelOverlay::paint(juce::Graphics& g)
 {
     using namespace juce;
