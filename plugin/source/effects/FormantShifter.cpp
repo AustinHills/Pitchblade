@@ -5,6 +5,7 @@
 // ratio < 1.0 = darker (formants shift down)
 float FormantShifter::amountToRatio (float amount)
 {
+    // Map UI range to RubberBand formant ratio clamp
     float t = juce::jlimit (-1.0f, 1.0f, amount / 50.0f); // -1..1
     return juce::jlimit (0.8f, 1.25f, 1.0f + 0.25f * t);
 }
@@ -12,6 +13,7 @@ float FormantShifter::amountToRatio (float amount)
 
 void FormantShifter::prepare (double sampleRate, int maxBlockSize, int numChannels)
 {
+    // Allocate RubberBand stretcher and buffers sized to host constraints
     sr  = sampleRate;
     nCh = juce::jlimit (1, numChannels, numChannels);
 
@@ -52,6 +54,7 @@ void FormantShifter::prepare (double sampleRate, int maxBlockSize, int numChanne
 
 void FormantShifter::reset()
 {
+    // Flush RubberBand internal state and our FIFO
     if (stretcher)
         stretcher->reset();
 
@@ -61,6 +64,7 @@ void FormantShifter::reset()
 
 void FormantShifter::setShiftAmount (float amount)
 {
+    // Clamp UI amount and push updated formant scale into RubberBand
     shiftAmount = juce::jlimit (-50.0f, 50.0f, amount);
     formantRatio = amountToRatio (shiftAmount);
 
@@ -74,6 +78,7 @@ void FormantShifter::setShiftAmount (float amount)
 
 void FormantShifter::processBlock (juce::AudioBuffer<float>& buffer) noexcept
 {
+    // Stream block through RubberBand and align variable-latency output via FIFO
     juce::ScopedNoDenormals noDenormals;
 
     if (! stretcher)
@@ -127,6 +132,7 @@ void FormantShifter::processBlock (juce::AudioBuffer<float>& buffer) noexcept
 
 void FormantShifter::writeToFifo (const juce::AudioBuffer<float>& src, int numSamples)
 {
+    // Push chunked data into ring buffer, clamping overflows
     const int ch = juce::jmin (nCh, src.getNumChannels());
     int remaining = numSamples;
     int pos = 0;
@@ -158,6 +164,7 @@ void FormantShifter::writeToFifo (const juce::AudioBuffer<float>& src, int numSa
 
 void FormantShifter::readFromFifo (juce::AudioBuffer<float>& dst, int numSamples)
 {
+    // Pop exactly numSamples from FIFO, zero-filling if underflowing
     const int ch = juce::jmin (nCh, dst.getNumChannels());
     int remaining = numSamples;
     int pos = 0;

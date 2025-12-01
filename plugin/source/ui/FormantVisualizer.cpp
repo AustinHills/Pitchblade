@@ -4,6 +4,7 @@
 //=========================== Overlay ===========================
 void FormantVisualizer::FormantOverlay::paint(juce::Graphics& g)
 {
+    // Draw overlay markers, labels, and curve on top of the underlying frequency grid
     // Transparent background; draw only markers over the grid
     auto bounds = getLocalBounds();
     auto graph = bounds.reduced(0);
@@ -15,7 +16,13 @@ void FormantVisualizer::FormantOverlay::paint(juce::Graphics& g)
     // without modifying it: paint over the left strip and bottom strip.
     g.setColour(Colors::panel);
     g.fillRect(juce::Rectangle<int>(bounds.getX(), bounds.getY(), labelWidth, bounds.getHeight() - labelHeight));
-    g.fillRect(juce::Rectangle<int>(bounds.getX(), bounds.getBottom() - labelHeight, bounds.getWidth(), labelHeight));
+    // cover the FrequencyGraphVisualizer x-axis area (accounting for its internal padding)
+    const int freqGraphPad = 15; // padding used inside FrequencyGraphVisualizer
+    auto fgBounds = bounds.reduced(freqGraphPad);
+    auto fgXLabels = fgBounds.removeFromBottom(labelHeight);
+    const int coverY = std::max(bounds.getY(), fgXLabels.getY() - 6); // extend a few px upward to hide its border
+    const int coverHeight = bounds.getBottom() - coverY;
+    g.fillRect(juce::Rectangle<int>(bounds.getX(), coverY, bounds.getWidth(), coverHeight));
 
     // Compute an inner drawing area to avoid edge clipping and visually center content
     const int padX = 8;           // horizontal padding to keep lines off the border
@@ -137,17 +144,9 @@ void FormantVisualizer::FormantOverlay::paint(juce::Graphics& g)
     hasLast = true;
 }
 
-float FormantVisualizer::FormantOverlay::mapBaseFreqToX(float freq, juce::Rectangle<int> graph) const
-{
-    auto clamped = juce::jlimit(baseXAxisHz.getStart(), baseXAxisHz.getEnd(), freq);
-    float lf = std::log10(clamped);
-    float proportion = (lf - logBaseStart) / (logBaseEnd - logBaseStart);
-    // Avoid drawing on the exact right edge to prevent clipping
-    return juce::jmap(proportion, (float)graph.getX(), (float)graph.getRight() - 1.0f);
-}
-
 float FormantVisualizer::FormantOverlay::mapVisibleFreqToX(float freq, juce::Rectangle<int> graph) const
 {
+    // Map Hz within the focused 300-5000 Hz range to pixel X
     auto clamped = juce::jlimit(visibleXAxisHz.getStart(), visibleXAxisHz.getEnd(), freq);
     float lf = std::log10(clamped);
     float proportion = (lf - logVisibleStart) / (logVisibleEnd - logVisibleStart);
@@ -157,6 +156,7 @@ float FormantVisualizer::FormantOverlay::mapVisibleFreqToX(float freq, juce::Rec
 
 float FormantVisualizer::FormantOverlay::mapXToVisibleFreq(float x, juce::Rectangle<int> graph) const
 {
+    // Convert pixel X back to Hz for sampling the curve
     const float proportion = juce::jlimit(0.0f, 1.0f, (x - (float)graph.getX()) / (float)graph.getWidth());
     const float lf = juce::jmap(proportion, logVisibleStart, logVisibleEnd);
     return std::pow(10.0f, lf);
@@ -167,6 +167,7 @@ FormantVisualizer::FormantVisualizer(AudioPluginAudioProcessor& processorRef,
                                      juce::AudioProcessorValueTreeState& vts)
     : processor(processorRef), apvts(vts)
 {
+    // Compose background graph plus overlay and drive refresh from GLOBAL_FRAMERATE
     // Background grid/axes from FrequencyGraphVisualizer
     // Pass 0 y-axis labels to hide y-axis labeling for formants
     freqGraph = std::make_unique<FrequencyGraphVisualizer>(apvts, 0, 0);
@@ -201,6 +202,7 @@ FormantVisualizer::~FormantVisualizer()
 
 void FormantVisualizer::resized()
 {
+    // Keep overlay and grid stacked in the same bounds
     auto b = getLocalBounds();
     if (freqGraph) freqGraph->setBounds(b);
     if (overlay)   overlay->setBounds(b);
@@ -213,12 +215,14 @@ void FormantVisualizer::paint(juce::Graphics& g)
 
 void FormantVisualizer::timerCallback()
 {
+    // Repaint at the chosen frame rate when visible
     if (isShowing() && overlay)
         overlay->repaint();
 }
 
 void FormantVisualizer::parameterChanged(const juce::String& parameterID, float newValue)
 {
+    // Adjust repaint cadence when the global framerate setting changes
     if (parameterID != "GLOBAL_FRAMERATE")
         return;
 

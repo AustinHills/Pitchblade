@@ -1,13 +1,15 @@
-// Huda and reyna
 #include "Pitchblade/panels/EqualizerPanel.h"
 #include <JuceHeader.h>
 #include "Pitchblade/ui/ColorPalette.h"
 #include <BinaryData.h>
 #include "Pitchblade/ui/CustomLookAndFeel.h"
 
+// Huda Noor and Reyna Macabebe
+
 // ===================== EqualizerPanel =====================
 EqualizerPanel::EqualizerPanel (AudioPluginAudioProcessor& proc, juce::ValueTree& state, const juce::String& nodeTitle)
     : processor(proc), localState(state), panelTitle(nodeTitle) {
+    // Initialize knobs, labels, and bind to ValueTree/DSP setters
     //label names for dials - reyna
     lowFreq.setName("Low Freq");
     lowGain.setName("Low Gain");
@@ -86,6 +88,7 @@ EqualizerPanel::EqualizerPanel (AudioPluginAudioProcessor& proc, juce::ValueTree
 
 void EqualizerPanel::resized()
 {
+    // Arrange frequency knobs on top row and gain knobs on bottom row
     auto area = getLocalBounds();
     equalizerLabel.setBounds(area.removeFromTop(30));
 
@@ -161,15 +164,17 @@ void EqualizerPanel::setupKnob (juce::Slider& s, juce::Label& l, const juce::Str
     l.setJustificationType (juce::Justification::centred);
 }
 
-// Reyna 
+// Reyna Macabebe
 //deconstructor
 EqualizerPanel::~EqualizerPanel() {
+    // Stop listening to node state changes when destroyed
     if (localState.isValid())
         localState.removeListener(this);
 }
 
 void EqualizerPanel::valueTreePropertyChanged(juce::ValueTree& tree, const juce::Identifier& property)
 {
+    // Reflect external state changes into sliders and forward to DSP setters
     if (tree != localState) return;
     if (property == juce::Identifier("LowFreq"))   { auto v = (float)tree.getProperty("LowFreq");  lowFreq.setValue(v, juce::dontSendNotification);  processor.getEqualizer().setLowFreq(v); }
     if (property == juce::Identifier("LowGain"))   { auto v = (float)tree.getProperty("LowGain");  lowGain.setValue(v, juce::dontSendNotification);  processor.getEqualizer().setLowGainDb(v); }

@@ -1,4 +1,3 @@
-//hudas code
 #pragma once
 #include <JuceHeader.h>
 #include <algorithm>
@@ -14,9 +13,29 @@
   #define PARAM_FORMANT_MIX "FORMANT_MIX"
 #endif
 
+/*
+==============================================================================
+    FormantPanel 
+    - renders the UI controls and state wiring for the Formant node.
+    - It binds a shift slider (-50..50) and dry/wet mix slider to the node's ValueTree
+    - reflects external state changes back into the controls, and exposes the sliders 
+    for integration tests that verify APVTS wiring. 
+
+    Author: Huda Noor
+
+  *********************************************************
+  
+    FormantNode
+    - owns the DSP/mixing and
+    supplies this panel and its visualizer.
+
+    Author:Reyna Macabebe
+==============================================================================
+*/
+
+/*=======================Panel (UI) Author: Huda ========================*/
 class FormantPanel : public juce::Component, public juce::ValueTree::Listener {
 public:
-    explicit FormantPanel(AudioPluginAudioProcessor& proc);
     FormantPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& state);
     ~FormantPanel() override;
 
@@ -32,13 +51,11 @@ public:
 
 private:
     AudioPluginAudioProcessor& processor;
-    juce::Slider gainSlider;
     juce::Label panelTitle;
 
-    // --- Formant Shifter controls
+    // Formant Shifter controls
     juce::Label  formantLabel, mixLabel;
     juce::Slider formantSlider, mixSlider;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> formantAttach, mixAttach;
 
     // node local state for this panel
     juce::ValueTree localState;
@@ -46,14 +63,18 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(FormantPanel)
 };
 
-////////////////////////////////////////////////////////////
-
-// reynas changes > added dsp node defn to ui panel creation
-// formant dsp node , processes audio + makes own panel
-// inherits from EffectNode base class
+/*
+==============================================================================
+    Reynas changes
+    - added dsp node defn to ui panel creation
+    - formant dsp node , processes audio + makes own panel
+    - inherits from EffectNode base class
+==============================================================================
+*/
 class FormantNode : public EffectNode {
 public:
     FormantNode (AudioPluginAudioProcessor& proc) : EffectNode (proc, "FormantNode", "Formant"), processor (proc) {
+        // Ensure per-node state has defaults for UI-driven properties
         auto& state = getMutableNodeState();
 
         if (!state.hasProperty("FORMANT_SHIFT"))
@@ -64,7 +85,8 @@ public:
     }
 
     void process (AudioPluginAudioProcessor& proc, juce::AudioBuffer<float>& buffer) override {
-        // --- 0) Grab params from this node's local state
+        // Apply formant shift, blend dry/wet, then update visualizer formant state
+        //Grab params from this node's local state
         auto state = getNodeState();
         float shift = (float)state.getProperty("FORMANT_SHIFT", 0.0f);
         float mix = (float)state.getProperty("FORMANT_MIX", 1.0f);   // 0 dry, 1 wet
@@ -127,6 +149,7 @@ public:
     }
 
     std::unique_ptr<juce::Component> createPanel(AudioPluginAudioProcessor& proc) override {
+        // Build the editing UI for this node
         juce::ignoreUnused(proc);
         return std::make_unique<FormantPanel>(proc, getMutableNodeState());
     }
@@ -135,11 +158,13 @@ public:
     // Provide a visualizer for the bottom VisualizerPanel area
     std::unique_ptr<juce::Component> createVisualizer(AudioPluginAudioProcessor& proc) override
     {
+        // Attach a FormantVisualizer that reads latest formants from the processor
         return std::make_unique<FormantVisualizer>(proc, proc.apvts);
     }
 
     std::shared_ptr<EffectNode> clone() const override
     {
+        // Duplicate this node with its own internal state
         return std::make_shared<FormantNode> (processor);
     }
 

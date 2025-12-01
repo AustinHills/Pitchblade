@@ -6,9 +6,16 @@
 #include "Pitchblade/ui/ColorPalette.h"
 #include "Pitchblade/ui/FrequencyGraphVisualizer.h"
 
-//Author: huda
-// Visualizes detected formant frequencies as vertical markers over a log-frequency axis.
-// Pulls latest formants from the processor and repaints at the global framerate.
+/*
+==============================================================================
+    FormantVisualizer
+    Visualizes detected formant frequencies as vertical markers over a log-frequency axis.
+    Pulls latest formants from the processor and repaints at the global framerate.
+
+    Author: Huda Noor
+==============================================================================
+*/
+
 class FormantVisualizer : public juce::Component,
                           private juce::Timer,
                           private juce::AudioProcessorValueTreeState::Listener
@@ -52,16 +59,11 @@ private:
     private:
         AudioPluginAudioProcessor& proc;
         juce::AudioProcessorValueTreeState& apvtsRef;
-        // Underlying FrequencyGraphVisualizer uses ~20..20000 Hz log scale.
-        const juce::Range<float> baseXAxisHz { 20.0f, 20000.0f };
         // Visible window tailored to detected formants.
         const juce::Range<float> visibleXAxisHz { 300.0f, 5000.0f };
-        float logBaseStart = std::log10(baseXAxisHz.getStart());
-        float logBaseEnd = std::log10(baseXAxisHz.getEnd());
         float logVisibleStart = std::log10(visibleXAxisHz.getStart());
         float logVisibleEnd  = std::log10(visibleXAxisHz.getEnd());
 
-        float mapBaseFreqToX(float freq, juce::Rectangle<int> graph) const;
         float mapVisibleFreqToX(float freq, juce::Rectangle<int> graph) const;
         float mapXToVisibleFreq(float x, juce::Rectangle<int> graph) const;
 

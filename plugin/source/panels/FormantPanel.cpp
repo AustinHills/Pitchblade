@@ -5,6 +5,7 @@
 
 FormantPanel::FormantPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& state)
     : processor(proc), localState(state) {
+    // Wire UI controls to this node's local ValueTree state
     // Labels + sliders
     //label names for dials - reyna
     formantSlider.setName("Formant");
@@ -53,11 +54,13 @@ FormantPanel::FormantPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& sta
 }
 
 FormantPanel::~FormantPanel() {
+    // Stop listening to state updates when the panel is destroyed
     if (localState.isValid())
         localState.removeListener(this);
 }
 
 void FormantPanel::valueTreePropertyChanged(juce::ValueTree& tree, const juce::Identifier& property) {
+    // Mirror external ValueTree changes back into the sliders without feedback loops
     if (tree != localState)
         return;
 
@@ -69,6 +72,7 @@ void FormantPanel::valueTreePropertyChanged(juce::ValueTree& tree, const juce::I
 }
 
 void FormantPanel::resized() {
+    // Simple two-row layout for formant shift and mix controls
     panelTitle.setBounds(getLocalBounds().removeFromTop(30));
 
     auto r = getLocalBounds().reduced(12);
@@ -97,6 +101,7 @@ void FormantPanel::paint(juce::Graphics& g) {
 
 // XML serialization for saving/loading - reyna
 std::unique_ptr<juce::XmlElement> FormantNode::toXml() const {
+    // Persist node-local parameters for preset saves
     auto xml = std::make_unique<juce::XmlElement>("FormantNode");
     xml->setAttribute("name", effectName);
     xml->setAttribute("FormantShift", (float)getNodeState().getProperty("FORMANT_SHIFT", 0.0f));
@@ -105,6 +110,7 @@ std::unique_ptr<juce::XmlElement> FormantNode::toXml() const {
 }
 
 void FormantNode::loadFromXml(const juce::XmlElement& xml) {
+    // Restore node-local parameters from preset data
     auto& s = getMutableNodeState();
     s.setProperty("FORMANT_SHIFT", (float)xml.getDoubleAttribute("FormantShift", 0.0f), nullptr);
     s.setProperty("FORMANT_MIX", (float)xml.getDoubleAttribute("Mix", 100.0f), nullptr);
