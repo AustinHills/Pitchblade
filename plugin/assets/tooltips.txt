@@ -2,9 +2,10 @@
 // Tooltips for buttons and controls
 
 // top bar buttons
-presetButton	= Open and manage your presets
-bypassButton	= Toggle all effects on or off
-settingsButton	= Open plugin settings
+presetButton		= Open and manage your presets
+bypassButton		= Toggle all effects on or off
+settingsButton		= Open plugin settings
+lockBypassButton	= Lock entire Daisychain
 
 //indivdual daisy chain buttons
 modeButton	 = Change chaining mode

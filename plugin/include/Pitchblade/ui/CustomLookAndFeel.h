@@ -1,10 +1,10 @@
 //reyna 
+/* custom LookAndFeel for Pitchblade GUI to make custom buttons, sliders, tooltips, and popup menus */
 #pragma once
 #include <JuceHeader.h>
 #include "Pitchblade/ui/CustomLookAndFeel.h"
 #include "Pitchblade/ui/ColorPalette.h"
 
-//
 struct CustomLookAndFeel : public juce::LookAndFeel_V4
 {
     CustomLookAndFeel()

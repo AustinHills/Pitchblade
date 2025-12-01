@@ -32,11 +32,12 @@ private:
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(DeNoiserPanel)
 public:
-    explicit DeNoiserPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& state);
+    explicit DeNoiserPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& state, const juce::String& nodeTitle);
     ~DeNoiserPanel() override;
 
     void resized() override;
     void paint(juce::Graphics&) override;
+    juce::String panelTitle;
 
     //Callback for countdown timer
     void timerCallback() override;
@@ -112,7 +113,7 @@ public:
 
     //return UI panel linked to node
     std::unique_ptr<juce::Component> createPanel(AudioPluginAudioProcessor& proc) override {
-        return std::make_unique<DeNoiserPanel>(proc,getMutableNodeState());
+        return std::make_unique<DeNoiserPanel>(proc,getMutableNodeState(), effectName);
     }
 
     //return visualizer

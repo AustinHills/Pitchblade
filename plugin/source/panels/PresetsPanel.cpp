@@ -6,10 +6,12 @@
 // default preset resets all parameters to default values 
 
 PresetsPanel::PresetsPanel(AudioPluginAudioProcessor& proc) : processor(proc) {
+	// buttons
     addAndMakeVisible(saveButton);
     addAndMakeVisible(loadButton);
     addAndMakeVisible(defaultButton);
 
+	// button styles
     saveButton.onClick = [this]() { handleSavePreset(); };
     loadButton.onClick = [this]() { handleLoadPreset(); };
     defaultButton.onClick = [this]() { showDefaultMenu(); };
@@ -20,6 +22,7 @@ PresetsPanel::PresetsPanel(AudioPluginAudioProcessor& proc) : processor(proc) {
     statusLabel.setColour(juce::Label::textColourId, Colors::buttonText);
     statusLabel.setText("", juce::dontSendNotification);
 
+	// preset loaded message timeout
     statusLabel.setText("Preset loaded successfully!", juce::dontSendNotification);
     juce::Timer::callAfterDelay(2000, [this]() {
         statusLabel.setText("", juce::dontSendNotification); 
@@ -27,6 +30,7 @@ PresetsPanel::PresetsPanel(AudioPluginAudioProcessor& proc) : processor(proc) {
 
 }
 
+// paint and layout
 void PresetsPanel::paint(juce::Graphics& g) {
     auto r = getLocalBounds().toFloat();
 
@@ -39,8 +43,7 @@ void PresetsPanel::paint(juce::Graphics& g) {
     );
 
     g.setGradientFill(gradient);
-    
-
+   
     g.fillRect(getLocalBounds());
     g.drawRect(getLocalBounds(), 2);
 
@@ -54,6 +57,7 @@ void PresetsPanel::paint(juce::Graphics& g) {
     g.drawLine(10.0f, y, (float)getWidth() - 10.0f, y, 3.0f);
 }
 
+// layout
 void PresetsPanel::resized() {
     auto area = getLocalBounds().reduced(45);
     const int buttonH = 60;
@@ -67,9 +71,9 @@ void PresetsPanel::resized() {
     statusLabel.setBounds(area.removeFromTop(30));
 }
 
-/////////////////////////////////
-// preset handlers
+/////////////////////////////////// preset handlers
 
+// save preset to xml file
 void PresetsPanel::handleSavePreset() {
 	// makes sure preset directory exists
     auto initialDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
@@ -91,9 +95,9 @@ void PresetsPanel::handleSavePreset() {
             }
             chooser.reset();
         });
-	//if (onPresetActionFinished) onPresetActionFinished();   // callback after preset action
 }
 
+// load preset from xml file
 void PresetsPanel::handleLoadPreset() {
     auto initialDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("Pitchblade/Presets");
     initialDir.createDirectory();
@@ -114,22 +118,11 @@ void PresetsPanel::handleLoadPreset() {
             }
             chooser.reset();
         });
-    //if (onPresetActionFinished) onPresetActionFinished();
 }
 
-void PresetsPanel::handleDefaultPreset() {
-	// reset to default preset defined in AudioPluginAudioProcessor
-    processor.loadDefaultPreset("Default");
-    statusLabel.setText("Default preset loaded", juce::dontSendNotification);
-
-    juce::MessageManager::callAsync([this]() {
-        if (onPresetActionFinished) onPresetActionFinished();
-        });
-}
-
+// show default preset menu
 void PresetsPanel::showDefaultMenu() {
     juce::PopupMenu menu;
-
     //  all effects - all default effects
     menu.addItem("All Effects", [this]() {
         processor.loadDefaultPreset("default");

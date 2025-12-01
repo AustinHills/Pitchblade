@@ -8,12 +8,11 @@
 
 
 //gain panel display
-GainPanel::GainPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& state) : processor(proc), localState(state) {    // added valuetree and localstate - reyna
-    //label names for dials - reyna
-    gainSlider.setName("Gain");
+GainPanel::GainPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& state, const juce::String& nodeTitle)
+                     : processor(proc), localState(state), panelTitle(nodeTitle) {    // added valuetree and localstate - reyna
 
     // Gain Label - Austin
-    gainLabel.setText("Gain", juce::dontSendNotification);
+    gainLabel.setText(panelTitle, juce::dontSendNotification);
     gainLabel.setName("NodeTitle");
     addAndMakeVisible(gainLabel);
 

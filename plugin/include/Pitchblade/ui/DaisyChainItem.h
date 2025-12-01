@@ -1,4 +1,17 @@
 ﻿//reyna 
+/*
+    The DaisyChainItem class represents a single row inside the DaisyChain.
+    Each item contains the effect button, bypass button, chain mode button,
+    drag handles, and optional right side widgets for double rows. 
+
+    also manages all drag and drop highlighting, drop target logic, and
+    visual states for bypass and chain mode. 
+    
+    It does not perform DSP. It only reports user actions such as reordering, 
+    mode changes, or bypass changes so the DaisyChain can update the processor 
+    layout and rebuild the UI.
+*/
+
 #pragma once
 #include <JuceHeader.h>
 #include "Pitchblade/ui/ColorPalette.h"
@@ -9,10 +22,9 @@
 class DaisyChain;
 
 //merges effect buttons and bypass buttons into one row item for daisychain drag n drop
-class DaisyChainItem : public juce::Component,
-						public juce::DragAndDropTarget
-{
+class DaisyChainItem : public juce::Component, public juce::DragAndDropTarget {
 public:
+	// constructor
 	DaisyChainItem(const juce::String& effectName, int index) :  myIndex(index) {
         setName(effectName);  // left cell name
 
@@ -20,7 +32,8 @@ public:
         grip.setText({}, juce::dontSendNotification);
         grip.setJustificationType(juce::Justification::centred);
         grip.setMouseCursor(juce::MouseCursor::DraggingHandCursor);
-        grip.addMouseListener(this, true);                 // only grip can drag
+        grip.addMouseListener(this, true);   // only grip can drag
+
 		//right grip for double rows
         addAndMakeVisible(grip);
         addAndMakeVisible(rightGrip);
@@ -33,6 +46,7 @@ public:
 		button.setButtonText(effectName);
 		addAndMakeVisible(button);
 
+		// make buttons transparent
         button.setOpaque(false);
         rightButton.setOpaque(false);
         modeButton.setOpaque(false);
@@ -40,7 +54,8 @@ public:
         rightMode.setOpaque(false);
         rightBypass.setOpaque(false);
 
-        button.onClick = [this] {         // turn active button pink on click
+        // turn active button pink on click
+        button.onClick = [this] {         
             onEffectSelected = !onEffectSelected; // toggle selection state
             if (onEffectSelected) { button.setColour(juce::TextButton::buttonColourId, Colors::accent); }
             else { button.setColour(juce::TextButton::buttonColourId, Colors::panel); }
@@ -56,9 +71,10 @@ public:
         bypass.setButtonText("B");
         bypass.setClickingTogglesState(false);
        
+		// toggle bypass state and color on click
         bypass.onClick = [this] {
                 bypassed = !bypassed;
-                if (bypassed) { bypass.setButtonText("B"); }// strikethrough B not workn rn
+                if (bypassed) { bypass.setButtonText("B"); }
                 else { bypass.setButtonText("B"); }
                 // notify daisychain of bypass change
 				if (onBypassChanged) onBypassChanged(myIndex, bypassed); 
@@ -135,9 +151,7 @@ public:
         repaint();
     }
 
-    int getChainModeId() const { 
-        return chainModeId; 
-    }
+    int getChainModeId() const {  return chainModeId;  }
 
 	//update chain mode button visuals
     void updateModeVisual() {
@@ -163,8 +177,7 @@ public:
     }
 
 	//for external bypass changes, changes button color if gobal bypassed
-    void updateBypassVisual(bool state)
-    {
+    void updateBypassVisual(bool state) {
         bypassed = state;
 
         const auto bg = state ? juce::Colours::hotpink : Colors::panel;
@@ -201,22 +214,24 @@ public:
         }
     }
 
+	// on mouse up, notify of interaction
     void mouseUp(const juce::MouseEvent& e) override {
         juce::ignoreUnused(e);
 		if (onAnyInteraction) onAnyInteraction();  // notify of interaction
     }
 
+	// drag and drop target overrides 
     bool isInterestedInDragSource(const juce::DragAndDropTarget::SourceDetails& details) override {
         juce::ignoreUnused(details);
         return true;
     }
 
+	// when item is dragged into this component
     void itemDragEnter(const juce::DragAndDropTarget::SourceDetails& details) override {
         juce::ignoreUnused(details);
-        // default: highlight whole row
-        //setAlpha(0.7f);
     }
 
+	// when item is dragged out of this component
     void itemDragExit(const juce::DragAndDropTarget::SourceDetails& details) override {
         setAlpha(1.0f);
         showDropAbove = false;
@@ -224,6 +239,7 @@ public:
         repaint();
     }
 
+	// while item is being dragged over this component
     void itemDragMove(const juce::DragAndDropTarget::SourceDetails& details) override {
         auto local = details.localPosition;
 		// halfway point 
@@ -235,6 +251,7 @@ public:
         repaint();
     }
 
+	// when item is dropped on this component
     void itemDropped(const juce::DragAndDropTarget::SourceDetails& details) override { 
         if (onReorder) {
             const juce::String dragName = details.description.toString();
@@ -317,6 +334,7 @@ public:
         resized();
         repaint();
     }
+
 	// clear second effect
     void clearSecondaryEffect() {
         isDoubleRow = false;
@@ -331,6 +349,7 @@ public:
         repaint();
     }
 
+	// update right bypass visual
     void updateSecondaryBypassVisual(bool state) {
         rightBypassed = state;
         const auto bg = state ? juce::Colours::hotpink : Colors::panel;
@@ -341,6 +360,7 @@ public:
         rightBypass.repaint();
     }
 
+	// update right mode visual
     void updateRightModeVisual() {
         juce::Colour bg = juce::Colour(0xffae66ed); 
         rightMode.setColour(juce::TextButton::buttonColourId, bg);
@@ -350,13 +370,14 @@ public:
         rightMode.repaint();
     }
 
-    /////////////////////////////////////////////////////////////////////////////
-	// callbacks
-    std::function<void(int, juce::String, int)> onReorder;
+    /////////////////////////////////////////////////////////////////////////////// callbacks
+	
+	std::function<void(int, juce::String, int)> onReorder;  // kind (-1=above, -2=right), dragged name, target index
 
-    bool isDoubleRow = false;
-    bool bypassed = false;
+	bool isDoubleRow = false;       // is this a double row
+	bool bypassed = false;          // left bypass state
 
+	// getters
     int getIndex() const { return myIndex; }
     std::function<void(int, bool)> onBypassChanged;     //row index, bypass
 	std::function<void(int, int)> onModeChanged;        //row index, mode id
@@ -395,10 +416,9 @@ public:
     std::function<void()> onAnyInteraction;   // notify daisychain of interaction
     std::function<bool()> canDrag;            // check if drag allowed
 
-    static juce::String chaingID(int id)
-    {
-        switch (id)
-        {
+	// helper to get chain mode string from id
+    static juce::String chaingID(int id) {
+        switch (id) {
         case 1: return "D";   // Down
         case 2: return "S";   // Split
         case 3: return "DD";  // Double

@@ -1,31 +1,22 @@
 #include "Pitchblade/effects/Equalizer.h"
-//Author: huda
-// More robust version with unity gain bypass
 
-// tiny helper: dB to linear gain (floor at -60 dB to avoid denorm-ish stuff)
-static inline float dbToGain(float dB)
-{
-    return juce::Decibels::decibelsToGain(dB, -60.0f);
-}
+//Author: Huda Noor
+// More robust version with unity gain bypass
 
 void Equalizer::prepare(double sampleRate, int maxBlockSize, int numChannels)
 {
+    // Initialize smoothing, per-band filters, and coefficients for the given format
     sr = sampleRate;
     channels = juce::jmax(1, numChannels);
     isPrepared = true;
 
-    // initialise smoothed gains (store dB values, smooth on audio thread)
+    // initialize smoothing filters
     lowGainSmooth.reset(sr, smoothingTimeSeconds);
     midGainSmooth.reset(sr, smoothingTimeSeconds);
     highGainSmooth.reset(sr, smoothingTimeSeconds);
     lowGainSmooth.setCurrentAndTargetValue(lowGainDb.load());
     midGainSmooth.setCurrentAndTargetValue(midGainDb.load());
     highGainSmooth.setCurrentAndTargetValue(highGainDb.load());
-
-    // track last applied freqs
-    lastLowFreqHz  = lowFreqHz.load();
-    lastMidFreqHz  = midFreqHz.load();
-    lastHighFreqHz = highFreqHz.load();
 
     // allocate filter states per band/channel
     auto makeBand = [this](Band& b)
@@ -55,6 +46,7 @@ void Equalizer::prepare(double sampleRate, int maxBlockSize, int numChannels)
 
 void Equalizer::reset()
 {
+    // Reset filter state but leave configuration intact
     for (auto& f : lowBand .filters) f.reset();
     for (auto& f : midBand .filters) f.reset();
     for (auto& f : highBand.filters) f.reset();
@@ -62,36 +54,43 @@ void Equalizer::reset()
 
 void Equalizer::setLowFreq(float hz)
 {
+    // Clamp and store low-shelf cutoff in Hz
     lowFreqHz = juce::jlimit(20.0f, 1000.0f, hz);
 }
 
 void Equalizer::setLowGainDb(float dB)
 {
+    // Clamp and store low-shelf gain in dB
     lowGainDb = juce::jlimit(-24.0f, 24.0f, dB);
 }
 
 void Equalizer::setMidFreq(float hz)
 {
+    // Clamp and store mid-band center frequency in Hz
     midFreqHz = juce::jlimit(200.0f, 6000.0f, hz);
 }
 
 void Equalizer::setMidGainDb(float dB)
 {
+    // Clamp and store mid-band gain in dB
     midGainDb = juce::jlimit(-24.0f, 24.0f, dB);
 }
 
 void Equalizer::setHighFreq(float hz)
 {
+    // Clamp and store high-shelf cutoff in Hz
     highFreqHz = juce::jlimit(1000.0f, 18000.0f, hz);
 }
 
 void Equalizer::setHighGainDb(float dB)
 {
+    // Clamp and store high-shelf gain in dB
     highGainDb = juce::jlimit(-24.0f, 24.0f, dB);
 }
 
 void Equalizer::updateFilters()
 {
+    // Recompute filter coefficients from current parameter values
     if (!isPrepared)
         return;
 
@@ -123,6 +122,7 @@ void Equalizer::updateFilters()
 
 void Equalizer::processBlock(juce::AudioBuffer<float>& buffer) noexcept
 {
+    // Smooth gain changes, update coefficients, and apply per-band filters
     if (!isPrepared || buffer.getNumChannels() == 0)
         return;
 

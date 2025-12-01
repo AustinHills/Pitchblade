@@ -1,26 +1,26 @@
-#include <juce_core/juce_core.h>  // Or just include juce/juce.h
+#include <juce_core/juce_core.h>  
 #include <JuceHeader.h>
+#include "BinaryData.h"
 #include "Pitchblade/PluginProcessor.h"
 #include "Pitchblade/PluginEditor.h"
-#include "Pitchblade/ui/ColorPalette.h"
 
-// ui
+// ui - reyna
 #include "Pitchblade/ui/TopBar.h"
 #include "Pitchblade/ui/DaisyChain.h"
+#include "Pitchblade/ui/ColorPalette.h"
 #include "Pitchblade/ui/EffectPanel.h"
 #include "Pitchblade/ui/VisualizerPanel.h"
+#include "Pitchblade/ui/DaisyChainItem.h"
+
+#include "Pitchblade/panels/EffectNode.h"
+#include "Pitchblade/ui/TooltipManager.h"   //tooltips 
+
+// panels - Austin and reyna
 #include "Pitchblade/panels/SettingsPanel.h"
 #include "Pitchblade/panels/PresetsPanel.h"
 
-#include "Pitchblade/ui/DaisyChainItem.h"
-#include "Pitchblade/panels/EffectNode.h"
-
-//tooltips
-#include "BinaryData.h"
-#include "Pitchblade/ui/TooltipManager.h"
-
 //==============================================================================
-// helper struct to convert DaisyChain::Row to processing row format 
+// helper to convert DaisyChain Row to processing row procRow - reyna
 struct ProcRow { juce::String left, right; };
 static std::vector<ProcRow> toProcRows(const std::vector<DaisyChain::Row>& uiRows) {
     std::vector<ProcRow> out;
@@ -103,6 +103,8 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
 	// assign tooltips to top bar and global daisychain buttons
     topBar.presetButton.setTooltip(tooltipManager.getTooltipFor("presetButton"));
     topBar.bypassButton.setTooltip(tooltipManager.getTooltipFor("bypassButton"));
+    topBar.lockBypassButton.setTooltip(tooltipManager.getTooltipFor("lockBypassButton"));
+
     topBar.settingsButton.setTooltip(tooltipManager.getTooltipFor("settingsButton"));
     daisyChain.addButton.setTooltip(tooltipManager.getTooltipFor("addButton"));
     daisyChain.duplicateButton.setTooltip(tooltipManager.getTooltipFor("duplicateButton"));
@@ -110,21 +112,62 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
 
   
 	// global bypass button / reyna  ////////////////////////////////////////////
-    // Top bar bypass daisychains
+    // Top bar bypass daisychain
+    // now acts by toggling all individual effect bypasses
     topBar.bypassButton.setClickingTogglesState(false);
-    topBar.bypassButton.onClick = [this]() {
-        const bool newState = !processorRef.isBypassed();
+
+    // LockBypass button, restores the old global bypass behavior
+    topBar.lockBypassButton.setClickingTogglesState(false);
+    topBar.lockBypassButton.onClick = [this]() {
+
+        // disable lock interaction when overlays are open
+        if (isShowingSettings || isShowingPresets)
+            return;
+
+        isLockBypassActive = !isLockBypassActive;
+        const bool newState = isLockBypassActive;
         processorRef.setBypassed(newState);
 
-		//update topbar bypass button color
-        const auto bg = newState ? Colors::accent : Colors::panel;
-            topBar.bypassButton.setColour(juce::TextButton::buttonColourId, bg);
-            topBar.bypassButton.setColour(juce::TextButton::buttonOnColourId, bg); 
-            topBar.bypassButton.setColour(juce::TextButton::textColourOffId, Colors::buttonText);
-            topBar.bypassButton.setColour(juce::TextButton::textColourOnId, Colors::buttonText); 
-            topBar.bypassButton.repaint();
-			//update daisychain bypass buttons color : greyed out
-            daisyChain.setGlobalBypassVisual(newState);
+        // color the lock bypass button
+        topBar.setButtonActive(topBar.lockBypassButton, newState);
+
+        daisyChain.setGlobalBypassVisual(newState);   // restore old grey out behavior
+        daisyChain.setChainControlsEnabled(!newState);
+        daisyChain.setReorderLocked(newState);
+
+        // if locked, no interaction allowed
+        for (int i = 0; i < daisyChain.items.size(); ++i) {
+            if (auto* row = daisyChain.items[i]) {
+                row->setInterceptsMouseClicks(!newState, !newState);
+                row->bypass.setEnabled(!newState);
+                row->modeButton.setEnabled(!newState);
+                row->button.setEnabled(!newState);
+                row->rightButton.setEnabled(!newState);
+                row->rightBypass.setEnabled(!newState);
+                row->rightMode.setEnabled(!newState);
+
+                row->setAlpha(newState ? 0.55f : 1.0f);
+            }
+        }
+
+        daisyChain.repaint();
+        };
+
+    topBar.bypassButton.onClick = [this]() {
+        // if not all bypassed, bypass everything
+        // if already all bypassed, unbypass everything
+        const bool allBypassed = areAllEffectsBypassed();
+        const bool newState = !allBypassed;  
+
+        setAllEffectsBypassed(newState);
+
+        // update top bar button and daisychain global state
+        topBar.setButtonActive(topBar.bypassButton, newState);
+        };
+
+    // keep global bypass button in sync with individual bypasses
+    daisyChain.onAnyBypassChanged = [this]() {
+        syncGlobalBypassButton();
         };
 
 	//connect DaisyChain buttons to EffectPanel
@@ -428,7 +471,10 @@ void AudioPluginAudioProcessorEditor::buttonClicked(juce::Button* button){
 
         // reyna - updated how daisychain will lock 
 		// Lock or unlock daisychain reordering based on settings visibility
-        daisyChain.setChainControlsEnabled(!isShowingSettings);
+        if (!isLockBypassActive) {
+            daisyChain.setChainControlsEnabled(!isShowingSettings);
+            daisyChain.setReorderLocked(isShowingSettings);
+        }
 
         ////show or hide the panels based on the state of the settings
         settingsPanel.setVisible(isShowingSettings);
@@ -440,7 +486,6 @@ void AudioPluginAudioProcessorEditor::buttonClicked(juce::Button* button){
 		// enable/disable daisychain buttons based on settings visibility
         topBar.setButtonActive(topBar.settingsButton, isShowingSettings);
         topBar.setButtonActive(topBar.presetButton, false);
-        daisyChain.setReorderLocked(isShowingSettings);
 
         if (isShowingSettings)
             topBar.setButtonActive(topBar.presetButton, false);
@@ -449,7 +494,11 @@ void AudioPluginAudioProcessorEditor::buttonClicked(juce::Button* button){
     // reyna: preset button
     if (button == &topBar.presetButton) {
         isShowingPresets = !isShowingPresets;
-        daisyChain.setChainControlsEnabled(!isShowingPresets);
+        if (!isLockBypassActive) {
+            daisyChain.setChainControlsEnabled(!isShowingPresets);
+            daisyChain.setReorderLocked(isShowingPresets);
+        }
+
 
         presetsPanel.setVisible(isShowingPresets);
         visualizer.setVisible(!isShowingPresets);
@@ -459,8 +508,7 @@ void AudioPluginAudioProcessorEditor::buttonClicked(juce::Button* button){
 
         topBar.setButtonActive(topBar.presetButton, isShowingPresets);
         topBar.setButtonActive(topBar.settingsButton, false);
-        daisyChain.setReorderLocked(isShowingPresets);
-
+     
         if (isShowingPresets)
             topBar.setButtonActive(topBar.settingsButton, false);
     }
@@ -583,8 +631,10 @@ void AudioPluginAudioProcessorEditor::closeOverlaysIfOpen() {
     }
 	// if either was open, we close
     if (closedSomething) {
-        daisyChain.setReorderLocked(false);
-        daisyChain.setChainControlsEnabled(true);
+        if (!isLockBypassActive) {
+            daisyChain.setChainControlsEnabled(true);
+            daisyChain.setReorderLocked(false);
+        }
         daisyChain.repaint();
     }
 
@@ -608,4 +658,66 @@ bool AudioPluginAudioProcessorEditor::isPresetsVisible() const {
 
 bool AudioPluginAudioProcessorEditor::isSettingsVisible() const { 
     return isShowingSettings && settingsPanel.isVisible();
+}
+
+//global bypass functions - reyna
+bool AudioPluginAudioProcessorEditor::areAllEffectsBypassed() const {
+    std::lock_guard<std::recursive_mutex> lg(processorRef.getMutex());
+    auto& nodes = processorRef.getEffectNodes();
+
+    if (nodes.empty())
+        return false;
+
+    for (auto& node : nodes) {
+        if (node && !node->bypassed)
+            return false;
+    }
+    return true;
+}
+
+void AudioPluginAudioProcessorEditor::setAllEffectsBypassed(bool shouldBypass) {
+    {
+        // update processor nodes
+        std::lock_guard<std::recursive_mutex> lg(processorRef.getMutex());
+        auto& nodes = processorRef.getEffectNodes();
+        for (auto& node : nodes) {
+            if (node)
+                node->bypassed = shouldBypass;
+        }
+    }
+
+    // update DaisyChain to match node bypass states
+    std::lock_guard<std::recursive_mutex> lg(processorRef.getMutex());
+    auto& nodes = processorRef.getEffectNodes();
+
+    for (int i = 0; i < daisyChain.items.size(); ++i) {
+        if (auto* row = daisyChain.items[i]) {
+            // left cell
+            bool leftBypassed = false;
+            for (auto& node : nodes) {
+                if (node && node->effectName == row->getName()) {
+                    leftBypassed = node->bypassed;
+                    break;
+                }
+            }
+            row->updateBypassVisual(leftBypassed);
+
+            // right cell if present
+            if (!row->rightEffectName.isEmpty()) {
+                bool rightBypassed = false;
+                for (auto& node : nodes) {
+                    if (node && node->effectName == row->rightEffectName) {
+                        rightBypassed = node->bypassed;
+                        break;
+                    }
+                }
+                row->updateSecondaryBypassVisual(rightBypassed);
+            }
+        }
+    }
+}
+
+void AudioPluginAudioProcessorEditor::syncGlobalBypassButton() {
+    const bool allBypassed = areAllEffectsBypassed();
+    topBar.setButtonActive(topBar.bypassButton, allBypassed);
 }

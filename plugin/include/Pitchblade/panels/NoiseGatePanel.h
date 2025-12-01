@@ -12,13 +12,14 @@ public:
     void paint(juce::Graphics&) override;
 
     // overloaded constructor with local state
-    NoiseGatePanel(AudioPluginAudioProcessor& proc, juce::ValueTree& state);
+    NoiseGatePanel(AudioPluginAudioProcessor& proc, juce::ValueTree& state, const juce::String& nodeTitle);
 
     // destructor
     ~NoiseGatePanel() override;
 
     // valueTree listener callback
     void valueTreePropertyChanged(juce::ValueTree& tree, const juce::Identifier& property) override;
+    juce::String panelTitle;
 
 private:
     // Reference back to main processor
@@ -129,7 +130,7 @@ public:
     }
 
     std::unique_ptr<juce::Component> createPanel(AudioPluginAudioProcessor& proc) override {
-        return std::make_unique<NoiseGatePanel>(proc, getMutableNodeState());
+        return std::make_unique<NoiseGatePanel>(proc, getMutableNodeState(), effectName);
     }
 
     // return visualizer 

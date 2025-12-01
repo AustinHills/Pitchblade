@@ -129,7 +129,7 @@ TEST_F(EqualizerIntegrationTest, TC_96_EqualizerPanelLowBandUpdatesDsp)
     auto& state = node->getMutableNodeState();
 
     // Construct panel with the shared state.
-    EqualizerPanel panel(processor, state);
+    EqualizerPanel panel(processor, state, "Equalizer");
     panel.setSize(400, 200);
 
     // Drive parameters via ValueTree; listener will push to DSP.

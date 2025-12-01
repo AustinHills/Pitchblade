@@ -48,14 +48,10 @@ void SettingsPanel::paint(juce::Graphics& g){
 void SettingsPanel::resized(){
     //Layout of UI elements
     auto area = getLocalBounds();
-
     area.removeFromTop(50);
-
     auto framerateArea = area.removeFromTop(40).reduced(20,0);
 
     framerateLabel.setBounds(framerateArea.removeFromLeft(framerateArea.getWidth()/3));
-
     framerateArea.removeFromLeft(10);
-
     framerateDropDown.setBounds(framerateArea);
 }

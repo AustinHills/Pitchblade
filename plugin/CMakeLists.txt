@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.22)
 
 # Project name
-project(Pitchblade VERSION 0.1.0)
+project(Pitchblade VERSION 1.0.0)
 
 # RubberBand configuration==============================================
 set(RUBBERBAND_DIR ${CMAKE_SOURCE_DIR}/plugin/third-party/rubberband)

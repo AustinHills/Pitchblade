@@ -8,14 +8,15 @@
 #include "BinaryData.h"
 
 //noise gate panel display
-NoiseGatePanel::NoiseGatePanel(AudioPluginAudioProcessor& proc, juce::ValueTree& state) : processor(proc), localState(state) {
+NoiseGatePanel::NoiseGatePanel(AudioPluginAudioProcessor& proc, juce::ValueTree& state, const juce::String& nodeTitle) 
+                                : processor(proc), localState(state), panelTitle(nodeTitle) {
     //label names for dials - reyna
     thresholdSlider.setName("Threshold");
     attackSlider.setName("GateAttack");
     releaseSlider.setName("Release");
 
     // Label
-    noiseGateLabel.setText("Noise Gate", juce::dontSendNotification);
+    noiseGateLabel.setText(panelTitle, juce::dontSendNotification);
     addAndMakeVisible(noiseGateLabel);
     noiseGateLabel.setName("NodeTitle");
 

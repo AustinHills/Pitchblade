@@ -5,7 +5,7 @@
 /*
 ==============================================================================
     FormantShifter – Rubber Band Implementation
-    uses the Rubber Band Library for real-time formant
+    - uses the Rubber Band Library for real-time formant
     shifting while preserving pitch. 
     - Pitch scale is fixed at 1.0 (so that there is no actual pitch change).
     - Formant scale is controlled via setFormantScale(ratio):
@@ -38,8 +38,8 @@ public:
     // Main audio processing. In-place.
     void processBlock (juce::AudioBuffer<float>& buffer) noexcept;
 
-    // For global latency accounting
-    int getLatencySamples() const noexcept { return latencySamples; }
+    
+    int getLatencySamples() const noexcept { return latencySamples; } // For global latency accounting
     float getShiftAmount() const noexcept { return shiftAmount; }   // TEST BUG FIX: expose clamped amount for non-invasive testing
     float getFormantRatio() const noexcept { return formantRatio; } // TEST BUG FIX: expose mapped ratio for non-invasive testing
 

@@ -1,21 +1,39 @@
 #pragma once
-// Author: huda
-// reyna updated to new valuetree value system and nodebased system
 #include <JuceHeader.h>
 #include "Pitchblade/PluginProcessor.h"
 #include "Pitchblade/panels/EffectNode.h"
-// Visualizer lives separately (VisualizerPanel tabs)
 #include "Pitchblade/ui/EqualizerVisualizer.h"
 
-// ===================== Panel (UI) =====================
+/*
+==============================================================================
+    EqualizerPanel 
+    - hosts six knobs (low/mid/high freq + gain) bound to the node's
+    ValueTree state and thread-safe EQ setters, handling UI layout and state sync.
+
+    Author: Huda Noor
+
+   ************************************************************************** 
+   
+    EqualizerNode
+    - wires this panel into the node system and provides the visualizer.
+
+    Author: Reyna Macabebe
+==============================================================================
+*/
+
+// ===================== Panel (UI) Author: Huda =====================
 class EqualizerPanel : public juce::Component, public juce::ValueTree::Listener {
 public:
     //explicit EqualizerPanel (AudioPluginAudioProcessor& proc);
-    EqualizerPanel(AudioPluginAudioProcessor& p, juce::ValueTree& state);
+    // Build knob-only EQ panel and bind to the node's ValueTree state
+    EqualizerPanel(AudioPluginAudioProcessor& p, juce::ValueTree& state, const juce::String& nodeTitle);
 
     // display panel
+    // Draw simple outline and title
     void paint(juce::Graphics& g) override;
+    // Layout six knobs and labels across two rows
     void resized() override;
+    juce::String panelTitle;
 
     // destructor
     ~EqualizerPanel() override;
@@ -35,61 +53,19 @@ private:
     juce::Label  lowFreqLabel,  lowGainLabel,
                  midFreqLabel,  midGainLabel,
                  highFreqLabel, highGainLabel;
-    juce::Label panelTitle;
+    juce::Label equalizerLabel;
 
     void valueTreePropertyChanged(juce::ValueTree& tree, const juce::Identifier& property) override;
-
-    /*juce::AudioProcessorValueTreeState::SliderAttachment
-        lowFreqAttachment,  lowGainAttachment,
-        midFreqAttachment,  midGainAttachment,
-        highFreqAttachment, highGainAttachment;*/
 };
 
-// unneeded values now set in pluginprocessor.cpp in createParameterLayout
-
-//EqualizerPanel::EqualizerPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& stateToUse)
-//    : processor(proc),
-//    lowFreqAttachment(processor.apvts, "EQ_LOW_FREQ", lowFreq),
-//    lowGainAttachment(processor.apvts, "EQ_LOW_GAIN", lowGain),
-//    midFreqAttachment(processor.apvts, "EQ_MID_FREQ", midFreq),
-//    midGainAttachment(processor.apvts, "EQ_MID_GAIN", midGain),
-//    highFreqAttachment(processor.apvts, "EQ_HIGH_FREQ", highFreq),
-//    highGainAttachment(processor.apvts, "EQ_HIGH_GAIN", highGain)
-//{
-//    // identical knob setup as your default constructor
-//    setupKnob(lowFreq, lowFreqLabel, "Low Freq (Hz)", 20.0, 1000.0, 1.0, false);
-//    setupKnob(lowGain, lowGainLabel, "Low Gain (dB)", -24.0, 24.0, 0.1, true);
-//    setupKnob(midFreq, midFreqLabel, "Mid Freq (Hz)", 200.0, 6000.0, 1.0, false);
-//    setupKnob(midGain, midGainLabel, "Mid Gain (dB)", -24.0, 24.0, 0.1, true);
-//    setupKnob(highFreq, highFreqLabel, "High Freq (Hz)", 1000.0, 18000.0, 1.0, false);
-//    setupKnob(highGain, highGainLabel, "High Gain (dB)", -24.0, 24.0, 0.1, true);
-//
-//    addAndMakeVisible(lowFreq);   addAndMakeVisible(lowFreqLabel);
-//    addAndMakeVisible(lowGain);   addAndMakeVisible(lowGainLabel);
-//    addAndMakeVisible(midFreq);   addAndMakeVisible(midFreqLabel);
-//    addAndMakeVisible(midGain);   addAndMakeVisible(midGainLabel);
-//    addAndMakeVisible(highFreq);  addAndMakeVisible(highFreqLabel);
-//    addAndMakeVisible(highGain);  addAndMakeVisible(highGainLabel);
-//}
-
-
-//// ===================== Node =====================
-//class EqualizerNode : public EffectNode
-//{
-//public:
-//    explicit EqualizerNode (AudioPluginAudioProcessor& proc);
-//    EqualizerNode (AudioPluginAudioProcessor& proc, const juce::ValueTree& state);
-//
-//    // UI creator
-//    std::unique_ptr<juce::Component> createPanel (AudioPluginAudioProcessor& proc) override;
-//
-//    // DSP step
-//    void process (AudioPluginAudioProcessor& proc, juce::AudioBuffer<float>& buffer) override;
-//
-//    // Clone node
-//    std::shared_ptr<EffectNode> clone() const override;
-//};
-
+/*
+======================================================================================
+    Reynas changes
+    - EqualizerNode owns the EQ DSP hookup, ValueTree state, panel creation, visualizer,
+    cloning, and preset serialization for the EQ effect within the node-based chain
+    - inherits from EffectNode base class
+======================================================================================
+*/
 class EqualizerNode : public EffectNode
 {
 public:
@@ -119,7 +95,7 @@ public:
 
     // use node state for the panel
     std::unique_ptr<juce::Component> createPanel(AudioPluginAudioProcessor& proc) override {
-        return std::make_unique<EqualizerPanel>(proc, getMutableNodeState());
+        return std::make_unique<EqualizerPanel>(proc, getMutableNodeState(), effectName);
     }
 
     // Provide a visualizer component for VisualizerPanel
@@ -131,12 +107,13 @@ public:
     // keep existing DSP path 
     // push local state into the DSP and process
    void process(AudioPluginAudioProcessor& proc, juce::AudioBuffer<float>& buffer) override {
+    // Apply EQ using current parameters (already updated via UI setters)
     // Do not read ValueTree properties on the audio thread (not thread-safe).
     // The UI updates the Equalizer parameters via thread-safe setters when knobs move.
     proc.getEqualizer().processBlock(buffer);
 }
 
-    //reynas daisychain and presets stuff /////////////////////////////////////////
+    //reynas daisychain and presets changes /////////////////////////////////////////
 
     // clone
     std::shared_ptr<EffectNode> clone() const override {
