@@ -86,9 +86,10 @@
         float currentAmp;                   // Amplitude tracker for RMS cutoff
         float ampThreshold;                 // Threshold for RMS cutoff
         float referencePitch;               // Pitch that notes are tuned to
-        std::vector<std::vector<float>> pitchCandidates; // Likely pitch per frame for pYIN
+        std::vector<std::pair<int, float>> rawCandidates;// Likely pitch per frame for pYIN
         float voiceThreshold;                            // Min threshold for a freq to be considered voiced
         std::vector<PitchCandidate> previousCandidates;
+        std::vector<PitchCandidate> currentCandidates;
         float transitionCost = 15.f;                     // Penalty for changing pitch
 
         std::unique_ptr<juce::dsp::FFT> forwardFFT;      // Contain FFT info
