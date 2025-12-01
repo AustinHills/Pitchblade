@@ -63,7 +63,7 @@ private:
     };
     int scaleType = 0;
     int scaleOffset = 0;
-
+    
     // Parameters
     float currentRatio = 1.0f;
     float noteTransition;

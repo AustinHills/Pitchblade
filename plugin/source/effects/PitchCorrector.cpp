@@ -33,17 +33,17 @@ void PitchCorrector::prepare(double sampleRate, int blockSize)
  */
 void PitchCorrector::processBlock(juce::AudioBuffer<float>& buffer){
     // Process pitch detection
-    auto numSamples = buffer.getNumSamples();
     monoBuffer.copyFrom(0, 0, buffer, 0, 0 ,buffer.getNumSamples());
     pitchDetector.processBlock(monoBuffer);
 
     float detectedPitch = pitchDetector.getCurrentPitch();
-    if(detectedPitch <= 0.0f){
+    if(detectedPitch <= 50.f){
         pitchShifter.setPitchShiftRatio(1.0f); //bypass
         pitchShifter.processBlock(buffer);
 
         wasBypassing = true;
         stableCount = 0;
+
         currentRatio = 1.f; // reset ratio for smooth startup
 
         return;
@@ -57,9 +57,18 @@ void PitchCorrector::processBlock(juce::AudioBuffer<float>& buffer){
         if(stableCount < stableThreshold){
             pitchShifter.setPitchShiftRatio(1.0f);
             pitchShifter.processBlock(buffer);
+
+            //load prev midi with incoming note, to handle edge case of prev note being noise
+            float incomingMidi = frequencyToNote(detectedPitch);
+            prevMidi = incomingMidi;
+            lastStableMidi = incomingMidi;
+            currentRatio = 1.0f;
+
             return;
         }else{
             //note is stable, first valid block
+            wasBypassing = false;
+
             currentMidi = frequencyToNote(detectedPitch);        
             float detectedNote = pitchDetector.getCurrentMidiNote();
             float currentTarget = (float)quantizeToScale((int)std::round(detectedNote)); //determine target note
@@ -67,8 +76,6 @@ void PitchCorrector::processBlock(juce::AudioBuffer<float>& buffer){
             prevMidi = currentMidi;
             lastStableMidi = currentTarget;
             waverPhase = 0.f;
-            
-            wasBypassing = false;
         }
     }
 
@@ -212,6 +219,7 @@ float PitchCorrector::noteToFrequency(float midi){
  * @brief Helper function to convert frequency to midi note
  */
 float PitchCorrector::frequencyToNote(float freq){
+    if(freq < 50.0) return 0.0f;
     float midi = 69.0f + 12.0f * std::log2(freq / 440.0f);
     return midi;
 }
