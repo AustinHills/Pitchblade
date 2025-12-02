@@ -25,6 +25,10 @@ public:
     juce::TextButton settingsButton{ "Settings" };
     juce::TextButton lockBypassButton{ "Lock" };
 
+    //Undo/Redo buttons
+    juce::TextButton undoButton{ "Undo" };
+    juce::TextButton redoButton{ "Redo" };
+
 	// logo image
     juce::ImageComponent logo;
 };

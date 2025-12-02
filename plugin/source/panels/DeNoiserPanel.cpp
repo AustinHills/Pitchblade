@@ -63,7 +63,7 @@ DeNoiserPanel::DeNoiserPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& s
     reductionSlider.setRange(0.0,1.0f,0.01f);
     reductionSlider.setValue(startReduction,juce::dontSendNotification);
     reductionSlider.onValueChange = [this]() {
-        localState.setProperty("DenoiserReduction",(float)reductionSlider.getValue(),nullptr);
+        localState.setProperty("DenoiserReduction",(float)reductionSlider.getValue(),&processor.undoManager);
         };
 
     //Add this panel as a listener to the local state

@@ -44,12 +44,12 @@ FormantPanel::FormantPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& sta
     // Write back to node state
     formantSlider.onValueChange = [this]() {
         localState.setProperty("FORMANT_SHIFT",
-            (float)formantSlider.getValue(), nullptr);
+            (float)formantSlider.getValue(), &processor.undoManager);
         };
 
     mixSlider.onValueChange = [this]() {
         localState.setProperty("FORMANT_MIX",
-            (float)mixSlider.getValue(), nullptr);
+            (float)mixSlider.getValue(), &processor.undoManager);
         };
 }
 

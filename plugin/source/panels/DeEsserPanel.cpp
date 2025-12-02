@@ -84,35 +84,35 @@ DeEsserPanel::DeEsserPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& sta
     thresholdSlider.setRange(-100.0, 0.0, 0.1);
     thresholdSlider.setValue(startThresholdDb, juce::dontSendNotification);
     thresholdSlider.onValueChange = [this]() {
-        localState.setProperty("DeEsserThreshold", (float)thresholdSlider.getValue(), nullptr);
+        localState.setProperty("DeEsserThreshold", (float)thresholdSlider.getValue(), &processor.undoManager);
         };
 
     const float startRatio = (float)localState.getProperty("DeEsserRatio", 4.0f);
     ratioSlider.setRange(1.0f, 20.0f, 0.1f);
     ratioSlider.setValue(startRatio, juce::dontSendNotification);
     ratioSlider.onValueChange = [this]() {
-        localState.setProperty("DeEsserRatio", (float)ratioSlider.getValue(), nullptr);
+        localState.setProperty("DeEsserRatio", (float)ratioSlider.getValue(), &processor.undoManager);
         };
     
     const float startAttackMs = (float)localState.getProperty("DeEsserAttack", 5.0f);
     attackSlider.setRange(10.0f, 200.0f, 0.1f);
     attackSlider.setValue(startAttackMs, juce::dontSendNotification);
     attackSlider.onValueChange = [this]() {
-        localState.setProperty("DeEsserAttack", (float)attackSlider.getValue(), nullptr);
+        localState.setProperty("DeEsserAttack", (float)attackSlider.getValue(), &processor.undoManager);
         };
     
     const float startReleaseMs = (float)localState.getProperty("DeEsserRelease", 5.0f);
     releaseSlider.setRange(10.0f, 1000.0f, 0.1f);
     releaseSlider.setValue(startReleaseMs, juce::dontSendNotification);
     releaseSlider.onValueChange = [this]() {
-        localState.setProperty("DeEsserRelease", (float)releaseSlider.getValue(), nullptr);
+        localState.setProperty("DeEsserRelease", (float)releaseSlider.getValue(), &processor.undoManager);
         };
 
     const float startFrequency = (float)localState.getProperty("DeEsserFrequency", 6000.0f);
     frequencySlider.setRange(2000.0, 12000.0, 10.0);
     frequencySlider.setValue(startFrequency, juce::dontSendNotification);
     frequencySlider.onValueChange = [this]() {
-        localState.setProperty("DeEsserFrequency", (float)frequencySlider.getValue(), nullptr);
+        localState.setProperty("DeEsserFrequency", (float)frequencySlider.getValue(), &processor.undoManager);
         };
     
     // Add this panel as a listener to the local state

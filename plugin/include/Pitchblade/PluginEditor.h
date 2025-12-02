@@ -68,6 +68,9 @@ public:
 	//Austin - button listener for settings/presets panel
     void buttonClicked(juce::Button* button) override;
 
+    //Shortcuts
+    bool keyPressed(const juce::KeyPress& key) override;
+
 private:
     // This reference is provided as a quick way for your editor to access the processor object that created it.
     AudioPluginAudioProcessor& processorRef;

@@ -31,7 +31,7 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
     // Create the AudioProcessorValueTreeState that stores all parameters.
     // It owns every parameter defined in createParameterLayout and handles
     // automation and preset saving
-    apvts(*this, nullptr, "Parameters", createParameterLayout()) {
+    apvts(*this, &undoManager, "Parameters", createParameterLayout()) {
 	    // check if effectNodes tree exists
         // branch stores the layout of the DaisyChain - effect ordering,
         // unique IDs, and all ValueTrees belonging to each EffectNode

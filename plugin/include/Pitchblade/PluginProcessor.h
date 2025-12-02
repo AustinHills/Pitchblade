@@ -113,6 +113,9 @@ public:
     void loadDefaultPreset(const juce::String& type);
     void clearAllNodes();  
 
+    //Undo/Redo stuff
+    juce::UndoManager undoManager;
+
 private:
     //============================================================================== 
     //processors

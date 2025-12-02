@@ -305,6 +305,17 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
             });     
         };
     }
+
+    //For undo manager
+    setWantsKeyboardFocus(true);
+
+    // Connect Undo/Redo buttons
+    topBar.undoButton.onClick = [this] { 
+        processorRef.undoManager.undo(); 
+    };
+    topBar.redoButton.onClick = [this] { 
+        processorRef.undoManager.redo(); 
+    };
 }
 
 // reyna - rebuild daisy chain and effect panel ui to sync with processor
@@ -720,4 +731,25 @@ void AudioPluginAudioProcessorEditor::setAllEffectsBypassed(bool shouldBypass) {
 void AudioPluginAudioProcessorEditor::syncGlobalBypassButton() {
     const bool allBypassed = areAllEffectsBypassed();
     topBar.setButtonActive(topBar.bypassButton, allBypassed);
+}
+
+//Capture shortcut keyboard inputs
+bool AudioPluginAudioProcessorEditor::keyPressed(const juce::KeyPress& key){
+    // Check for Ctrl+Z (Windows) or Cmd+Z (Mac)
+    if (key == juce::KeyPress::createFromDescription("command + z") ||
+        key == juce::KeyPress::createFromDescription("ctrl + z"))
+    {
+        processorRef.undoManager.undo();
+        return true;
+    }
+
+    // Check for Ctrl+Shift+Z or Cmd+Shift+Z (Redo)
+    if (key == juce::KeyPress::createFromDescription("command + shift + z") ||
+        key == juce::KeyPress::createFromDescription("ctrl + shift + z"))
+    {
+        processorRef.undoManager.redo();
+        return true;
+    }
+
+    return false;
 }

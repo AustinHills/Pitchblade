@@ -29,7 +29,7 @@ NoiseGatePanel::NoiseGatePanel(AudioPluginAudioProcessor& proc, juce::ValueTree&
     thresholdSlider.setRange(-100.0f, 0.0f, 0.1f);
     thresholdSlider.setValue((float)localState.getProperty("GateThreshold", -100.0f), juce::dontSendNotification); // read from tree
     thresholdSlider.onValueChange = [this]() { // NEW: write to tree
-        localState.setProperty("GateThreshold", (float)thresholdSlider.getValue(), nullptr);
+        localState.setProperty("GateThreshold", (float)thresholdSlider.getValue(), &processor.undoManager);
         };
 
       //Added these two to make them more nice looking and obvious for what they are - Austin
@@ -47,7 +47,7 @@ NoiseGatePanel::NoiseGatePanel(AudioPluginAudioProcessor& proc, juce::ValueTree&
     attackSlider.setRange(1.0f, 200.0f, 1.0f);
     attackSlider.setValue((float)localState.getProperty("GateAttack", 25.0f), juce::dontSendNotification); // read from tree
     attackSlider.onValueChange = [this]() { // NEW: write to tree
-        localState.setProperty("GateAttack", (float)attackSlider.getValue(), nullptr);
+        localState.setProperty("GateAttack", (float)attackSlider.getValue(), &processor.undoManager);
         };
 
     //Added these two to make them more nice looking and obvious for what they are - Austin
@@ -65,7 +65,7 @@ NoiseGatePanel::NoiseGatePanel(AudioPluginAudioProcessor& proc, juce::ValueTree&
     releaseSlider.setRange(10.0f, 1000.0f, 1.0f);
     releaseSlider.setValue((float)localState.getProperty("GateRelease", 100.0f), juce::dontSendNotification); // NEW
     releaseSlider.onValueChange = [this]() { // NEW
-        localState.setProperty("GateRelease", (float)releaseSlider.getValue(), nullptr);
+        localState.setProperty("GateRelease", (float)releaseSlider.getValue(), &processor.undoManager);
         };
 
     //Added these two to make them more nice looking and obvious for what they are - Austin
