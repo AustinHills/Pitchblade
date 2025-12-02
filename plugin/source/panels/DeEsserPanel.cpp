@@ -86,6 +86,9 @@ DeEsserPanel::DeEsserPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& sta
     thresholdSlider.onValueChange = [this]() {
         localState.setProperty("DeEsserThreshold", (float)thresholdSlider.getValue(), &processor.undoManager);
         };
+    thresholdSlider.onDragStart = [this]() {
+        processor.undoManager.beginNewTransaction();
+    };
 
     const float startRatio = (float)localState.getProperty("DeEsserRatio", 4.0f);
     ratioSlider.setRange(1.0f, 20.0f, 0.1f);
@@ -93,6 +96,9 @@ DeEsserPanel::DeEsserPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& sta
     ratioSlider.onValueChange = [this]() {
         localState.setProperty("DeEsserRatio", (float)ratioSlider.getValue(), &processor.undoManager);
         };
+    ratioSlider.onDragStart = [this]() {
+        processor.undoManager.beginNewTransaction();
+    };
     
     const float startAttackMs = (float)localState.getProperty("DeEsserAttack", 5.0f);
     attackSlider.setRange(10.0f, 200.0f, 0.1f);
@@ -100,6 +106,9 @@ DeEsserPanel::DeEsserPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& sta
     attackSlider.onValueChange = [this]() {
         localState.setProperty("DeEsserAttack", (float)attackSlider.getValue(), &processor.undoManager);
         };
+    attackSlider.onDragStart = [this]() {
+        processor.undoManager.beginNewTransaction();
+    };
     
     const float startReleaseMs = (float)localState.getProperty("DeEsserRelease", 5.0f);
     releaseSlider.setRange(10.0f, 1000.0f, 0.1f);
@@ -107,6 +116,9 @@ DeEsserPanel::DeEsserPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& sta
     releaseSlider.onValueChange = [this]() {
         localState.setProperty("DeEsserRelease", (float)releaseSlider.getValue(), &processor.undoManager);
         };
+    releaseSlider.onDragStart = [this]() {
+        processor.undoManager.beginNewTransaction();
+    };
 
     const float startFrequency = (float)localState.getProperty("DeEsserFrequency", 6000.0f);
     frequencySlider.setRange(2000.0, 12000.0, 10.0);
@@ -114,6 +126,9 @@ DeEsserPanel::DeEsserPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& sta
     frequencySlider.onValueChange = [this]() {
         localState.setProperty("DeEsserFrequency", (float)frequencySlider.getValue(), &processor.undoManager);
         };
+    frequencySlider.onDragStart = [this]() {
+        processor.undoManager.beginNewTransaction();
+    };
     
     // Add this panel as a listener to the local state
     localState.addListener(this);

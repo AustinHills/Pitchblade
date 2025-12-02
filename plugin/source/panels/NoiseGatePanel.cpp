@@ -31,6 +31,9 @@ NoiseGatePanel::NoiseGatePanel(AudioPluginAudioProcessor& proc, juce::ValueTree&
     thresholdSlider.onValueChange = [this]() { // NEW: write to tree
         localState.setProperty("GateThreshold", (float)thresholdSlider.getValue(), &processor.undoManager);
         };
+    thresholdSlider.onDragStart = [this]() {
+        processor.undoManager.beginNewTransaction();
+    };
 
       //Added these two to make them more nice looking and obvious for what they are - Austin
     thresholdSlider.setNumDecimalPlacesToDisplay(1);
@@ -49,6 +52,9 @@ NoiseGatePanel::NoiseGatePanel(AudioPluginAudioProcessor& proc, juce::ValueTree&
     attackSlider.onValueChange = [this]() { // NEW: write to tree
         localState.setProperty("GateAttack", (float)attackSlider.getValue(), &processor.undoManager);
         };
+    attackSlider.onDragStart = [this]() {
+        processor.undoManager.beginNewTransaction();
+    };
 
     //Added these two to make them more nice looking and obvious for what they are - Austin
     attackSlider.setNumDecimalPlacesToDisplay(1);
@@ -67,6 +73,9 @@ NoiseGatePanel::NoiseGatePanel(AudioPluginAudioProcessor& proc, juce::ValueTree&
     releaseSlider.onValueChange = [this]() { // NEW
         localState.setProperty("GateRelease", (float)releaseSlider.getValue(), &processor.undoManager);
         };
+    releaseSlider.onDragStart = [this]() {
+        processor.undoManager.beginNewTransaction();
+    };
 
     //Added these two to make them more nice looking and obvious for what they are - Austin
     releaseSlider.setNumDecimalPlacesToDisplay(1);

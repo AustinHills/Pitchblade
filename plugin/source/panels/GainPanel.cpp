@@ -33,6 +33,9 @@ GainPanel::GainPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& state, co
 
 	// update value tree on slider change
     gainSlider.onValueChange = [this]() { localState.setProperty("Gain", (float)gainSlider.getValue(), &processor.undoManager); };
+    gainSlider.onDragStart = [this]() {
+        processor.undoManager.beginNewTransaction();
+    };
 	localState.addListener(this);   // listen to changes in local state
 }
 

@@ -745,7 +745,9 @@ bool AudioPluginAudioProcessorEditor::keyPressed(const juce::KeyPress& key){
 
     // Check for Ctrl+Shift+Z or Cmd+Shift+Z (Redo)
     if (key == juce::KeyPress::createFromDescription("command + shift + z") ||
-        key == juce::KeyPress::createFromDescription("ctrl + shift + z"))
+        key == juce::KeyPress::createFromDescription("ctrl + shift + z") ||
+        key == juce::KeyPress::createFromDescription("command + y") ||
+        key == juce::KeyPress::createFromDescription("ctrl + y") )
     {
         processorRef.undoManager.redo();
         return true;

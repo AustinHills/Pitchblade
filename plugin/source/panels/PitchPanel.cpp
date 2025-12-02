@@ -117,6 +117,9 @@ PitchPanel::PitchPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& state)
     retuneSlider.onValueChange = [this]() {
         localState.setProperty("PitchRetune", (float)retuneSlider.getValue(), &processor.undoManager);
         };
+    retuneSlider.onDragStart = [this]() {
+        processor.undoManager.beginNewTransaction();
+    };
 
     const float noteTransitionCents = (float)localState.getProperty("PitchNoteTransition", 50.f);
     noteTransitionSlider.setRange(0.f, 50.f, 1.f);
@@ -124,6 +127,9 @@ PitchPanel::PitchPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& state)
     noteTransitionSlider.onValueChange = [this]() {
         localState.setProperty("PitchNoteTransition", (float)noteTransitionSlider.getValue(), &processor.undoManager);
         };
+    noteTransitionSlider.onDragStart = [this]() {
+        processor.undoManager.beginNewTransaction();
+    };
 
     const float smoothingPercent = (float)localState.getProperty("PitchSmoothing", 1.f);
     smoothingSlider.setRange(0.f, 1.f, 0.05f);
@@ -131,6 +137,9 @@ PitchPanel::PitchPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& state)
     smoothingSlider.onValueChange = [this]() {
         localState.setProperty("PitchSmoothing", (float)smoothingSlider.getValue(), &processor.undoManager);
         };
+    smoothingSlider.onDragStart = [this]() {
+        processor.undoManager.beginNewTransaction();
+    };
 
     const float waverCents = (float)localState.getProperty("PitchWaver", 0.f);
     waverSlider.setRange(0.f, 20.f, 1.f);
@@ -138,6 +147,9 @@ PitchPanel::PitchPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& state)
     waverSlider.onValueChange = [this]() {
         localState.setProperty("PitchWaver", (float)waverSlider.getValue(), &processor.undoManager);
         };
+    waverSlider.onDragStart = [this]() {
+        processor.undoManager.beginNewTransaction();
+    };
 
     localState.addListener(this);
 }

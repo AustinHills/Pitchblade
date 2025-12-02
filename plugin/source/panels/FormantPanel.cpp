@@ -46,11 +46,17 @@ FormantPanel::FormantPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& sta
         localState.setProperty("FORMANT_SHIFT",
             (float)formantSlider.getValue(), &processor.undoManager);
         };
+    formantSlider.onDragStart = [this]() {
+        processor.undoManager.beginNewTransaction();
+    };
 
     mixSlider.onValueChange = [this]() {
         localState.setProperty("FORMANT_MIX",
             (float)mixSlider.getValue(), &processor.undoManager);
         };
+    mixSlider.onDragStart = [this]() {
+        processor.undoManager.beginNewTransaction();
+    };
 }
 
 FormantPanel::~FormantPanel() {

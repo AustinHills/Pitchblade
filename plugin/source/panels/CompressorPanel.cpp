@@ -94,6 +94,9 @@ CompressorPanel::CompressorPanel(AudioPluginAudioProcessor& proc, juce::ValueTre
     thresholdSlider.onValueChange = [this]() {
         localState.setProperty("CompThreshold", (float)thresholdSlider.getValue(), &processor.undoManager);
         };
+    thresholdSlider.onDragStart = [this]() {
+        processor.undoManager.beginNewTransaction();
+    };
 
     const float startRatio = (float)localState.getProperty("CompRatio", 3.0f);
     ratioSlider.setRange(1.0f, 20.0f, 0.1f);
@@ -101,6 +104,9 @@ CompressorPanel::CompressorPanel(AudioPluginAudioProcessor& proc, juce::ValueTre
     ratioSlider.onValueChange = [this]() {
         localState.setProperty("CompRatio", (float)ratioSlider.getValue(), &processor.undoManager);
         };
+    ratioSlider.onDragStart = [this]() {
+        processor.undoManager.beginNewTransaction();
+    };
     
     const float startAttackMs = (float)localState.getProperty("CompAttack", 50.0f);
     attackSlider.setRange(1.0f, 200.0f, 1.0f);
@@ -108,6 +114,9 @@ CompressorPanel::CompressorPanel(AudioPluginAudioProcessor& proc, juce::ValueTre
     attackSlider.onValueChange = [this]() {
         localState.setProperty("CompAttack", (float)attackSlider.getValue(), &processor.undoManager);
         };
+    attackSlider.onDragStart = [this]() {
+        processor.undoManager.beginNewTransaction();
+    };
     
     const float startReleaseMs = (float)localState.getProperty("CompRelease", 250.0f);
     releaseSlider.setRange(10.0f, 1000.0f, 1.0f);
@@ -115,6 +124,9 @@ CompressorPanel::CompressorPanel(AudioPluginAudioProcessor& proc, juce::ValueTre
     releaseSlider.onValueChange = [this]() {
         localState.setProperty("CompRelease", (float)releaseSlider.getValue(), &processor.undoManager);
         };
+    releaseSlider.onDragStart = [this]() {
+        processor.undoManager.beginNewTransaction();
+    };
     
     // Add this panel as a listener to the local state
     localState.addListener(this);

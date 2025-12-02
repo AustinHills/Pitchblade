@@ -67,6 +67,10 @@ EqualizerPanel::EqualizerPanel (AudioPluginAudioProcessor& proc, juce::ValueTree
             else if (key == "HighFreq")  processor.getEqualizer().setHighFreq((float)s.getValue());
             else if (key == "HighGain")  processor.getEqualizer().setHighGainDb((float)s.getValue());
         };
+
+        s.onDragStart = [this]() {
+            processor.undoManager.beginNewTransaction();
+        };
     };
     updateTree(lowFreq, "LowFreq");
     updateTree(lowGain, "LowGain");
