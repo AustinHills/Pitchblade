@@ -290,8 +290,8 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
 
         presetsPanel.onPresetActionFinished = [this]() {
             // keep preset page visible
-            isShowingPresets = true;
-            presetsPanel.setVisible(true);
+            // isShowingPresets = true;
+            // presetsPanel.setVisible(true);
 
             //rebuild ui after preset data is updated
             juce::MessageManager::callAsync([this]() {
