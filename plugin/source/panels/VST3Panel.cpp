@@ -483,42 +483,43 @@ std::unique_ptr<juce::XmlElement> VST3Node::toXml() const {
 }
 
 void VST3Node::loadFromXml(const juce::XmlElement& xml) {
-    // Load the ID and instantiate the plugin
+    //Initialize hosting to populate the knownPluginList
     initializeHosting();
 
-    juce::String id = xml.getStringAttribute("pluginId");
+    //Use the name
     juce::String name = xml.getStringAttribute("name");
-    juce::MemoryBlock state;
     
+    //Decode the state
+    juce::MemoryBlock state;
     if (xml.hasAttribute("state")) {
         state.fromBase64Encoding(xml.getStringAttribute("state"));
     }
 
-    //Fallback for legacy presets (Name only, no ID)
-    if (id.isEmpty() && name.isNotEmpty()) {
+    //Iterate the loaded plugin list and find the one that matches the name.
+    juce::PluginDescription desc;
+    bool found = false;
+
+    if (name.isNotEmpty()) {
         const auto& types = knownPluginList.getTypes();
-        for (const auto& type : types) {
+        for (const auto& type : types) { 
             if (type.name == name) {
-                id = type.createIdentifierString();
+                desc = type;
+                found = true;
                 break;
             }
         }
     }
 
-    if (id.isNotEmpty()) {
-        auto type = knownPluginList.getTypeForIdentifierString(id);
-        if (!type) return;
-
-        // Custom Async Load that includes State Restoration
-        // We capture 'state' by value so it persists into the callback
+    if (found) {
+        // Async Load the found description
         std::weak_ptr<VST3Node> weakSelf = std::dynamic_pointer_cast<VST3Node>(shared_from_this());
 
-        formatManager->createPluginInstanceAsync(*type, 44100.0, 512, 
+        formatManager->createPluginInstanceAsync(desc, 44100.0, 512, 
             [weakSelf, state](std::unique_ptr<juce::AudioPluginInstance> instance, const juce::String& error) mutable {
                 if (auto self = weakSelf.lock()) {
                     self->finishLoad(std::move(instance), error);
                     
-                    // Apply state if load succeeded
+                    //Apply state if load succeeded
                     if (self->hostedPlugin && state.getSize() > 0) {
                         self->hostedPlugin->setStateInformation(state.getData(), (int)state.getSize());
                     }
