@@ -184,6 +184,7 @@ void DaisyChain::rebuild() {
         row->canDrag = [this]() { return !isReorderLocked(); };
         // close overlays and unlock when the user releases on the chain
         row->onAnyInteraction = [this]() {
+
                 if (onItemMouseUp) onItemMouseUp();   // forward to editor
             };
 

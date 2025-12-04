@@ -81,6 +81,9 @@ private:
     VisualizerPanel visualizer;
 
 	juce::String activeEffectName;  // for active effect button coloring
+    
+    //Tracks active effect index
+    int activeEffectIndex = 0;
 
 	TooltipManager tooltipManager;  // tooltip manager
     std::unique_ptr<juce::TooltipWindow> tooltipWindow;

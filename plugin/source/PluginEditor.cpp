@@ -184,6 +184,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
                     if (nodes[n] && nodes[n]->effectName == effectName) {
                         effectPanel.showEffect(n);
                         visualizer.showVisualizer(n);
+                        activeEffectIndex = n;
                         break;
                     }
                 }
@@ -240,6 +241,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
                             if (nodes[n] && nodes[n]->effectName == leftName) {
                                 effectPanel.showEffect(n);
                                 visualizer.showVisualizer(n);
+                                activeEffectIndex = n;
                                 break;
                             }
                         }
@@ -274,6 +276,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
                             if (nodes[n] && nodes[n]->effectName == name) {
                                 effectPanel.showEffect(n);
                                 visualizer.showVisualizer(n);
+                                activeEffectIndex = n;
                                 break;
                             }
                         }
@@ -347,6 +350,7 @@ void AudioPluginAudioProcessorEditor::rebuildAndSyncUI() {
                         effectPanel.showEffect(n);
                         visualizer.showVisualizer(n);
                         setActiveEffectByName(effectName);
+                        activeEffectIndex = n;
                         break;
                     }
                 }
@@ -361,6 +365,7 @@ void AudioPluginAudioProcessorEditor::rebuildAndSyncUI() {
                             if (nodes[n] && nodes[n]->effectName == rightName) {
                                 effectPanel.showEffect(n);
                                 visualizer.showVisualizer(n);
+                                activeEffectIndex = n;
                                 break;
                             }
                         }
@@ -371,8 +376,39 @@ void AudioPluginAudioProcessorEditor::rebuildAndSyncUI() {
         }
     }
     applyRowTooltips();
-    if (activeEffectName.isNotEmpty())
+    
+    // Try to find the active effect by name, if not found (renamed), fallback to index
+    if (activeEffectName.isNotEmpty()) {
+        auto& nodes = processorRef.getEffectNodes();
+        bool nameFound = false;
+        int foundIndex = -1;
+
+        for (int i = 0; i < (int)nodes.size(); ++i) {
+            if (nodes[i] && nodes[i]->effectName == activeEffectName) {
+                nameFound = true;
+                foundIndex = i;
+                break;
+            }
+        }
+
+        if (nameFound) {
+            // Name found, update index in case it moved
+            activeEffectIndex = foundIndex;
+        } else {
+            // Name not found, use stored index to restore selection (handle rename)
+            if (!nodes.empty()) {
+                activeEffectIndex = juce::jlimit(0, (int)nodes.size() - 1, activeEffectIndex);
+                if (nodes[activeEffectIndex]) {
+                    activeEffectName = nodes[activeEffectIndex]->effectName;
+                }
+            }
+        }
+
+        // Apply to UI
         setActiveEffectByName(activeEffectName);
+        effectPanel.showEffect(activeEffectIndex);
+        visualizer.showVisualizer(activeEffectIndex);
+    }
 }
 
 // set active daisychain name button as pink
