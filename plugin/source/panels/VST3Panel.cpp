@@ -348,6 +348,9 @@ void VST3Node::prepareToPlay(double sampleRate, int samplesPerBlock) {
 void VST3Node::scanStandardPlugins() {
     initializeHosting();
     if (scannerThread->isThreadRunning()) return;
+    //Below code can be reactivated if there is any issue with rescanning. I had a small issue so I wanted to test it
+    // knownPluginList.clear();
+    // scannerThread->progress.store(0.0f);
     scannerThread->startThread();
 }
 
