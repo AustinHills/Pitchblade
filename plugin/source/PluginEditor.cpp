@@ -753,5 +753,21 @@ bool AudioPluginAudioProcessorEditor::keyPressed(const juce::KeyPress& key){
         return true;
     }
 
+    // Check for Ctrl+S (Windows) or Cmd+S (Mac)
+    if (key == juce::KeyPress::createFromDescription("command + s") ||
+        key == juce::KeyPress::createFromDescription("ctrl + s"))
+    {
+        presetsPanel.handleSavePreset();
+        return true;
+    }
+
+    // Check for Ctrl+O (Windows) or Cmd+O (Mac)
+    if (key == juce::KeyPress::createFromDescription("command + o") ||
+        key == juce::KeyPress::createFromDescription("ctrl + o"))
+    {
+        presetsPanel.handleLoadPreset();
+        return true;
+    }
+
     return false;
 }
