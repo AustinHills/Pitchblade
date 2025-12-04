@@ -51,9 +51,12 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
     presetsPanel.setVisible(false);
     topBar.presetButton.addListener(this);
 
+    //Allowing for resize
+    setResizable(true,true);
+    setResizeLimits(800,600,0x7fffffff,0x7fffffff);
     
     // gui frontend / ui reyna ///////////////////////////////
-	setLookAndFeel(nullptr),    //reset look and feel
+	setLookAndFeel(nullptr);    //reset look and feel
 	setSize(800, 600);          //set editor size
 	setLookAndFeel(&customLF);  //apply custom look and feel globally
 
@@ -770,4 +773,19 @@ bool AudioPluginAudioProcessorEditor::keyPressed(const juce::KeyPress& key){
     }
 
     return false;
+}
+
+//For fullscreen
+void AudioPluginAudioProcessorEditor::parentHierarchyChanged()
+{
+    if (processorRef.wrapperType == juce::AudioProcessor::wrapperType_Standalone)
+    {
+        if (auto* window = dynamic_cast<juce::DocumentWindow*>(getTopLevelComponent()))
+        {
+            window->setTitleBarButtonsRequired(juce::DocumentWindow::allButtons, false);
+            
+            //Can be used to make it have the native title bar, but this does remove the ability to change input and output devices. Could potentially make a place to change them in settings?
+            //window->setUsingNativeTitleBar(true);
+        }
+    }
 }
