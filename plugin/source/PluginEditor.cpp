@@ -783,9 +783,9 @@ void AudioPluginAudioProcessorEditor::parentHierarchyChanged()
         if (auto* window = dynamic_cast<juce::DocumentWindow*>(getTopLevelComponent()))
         {
             window->setTitleBarButtonsRequired(juce::DocumentWindow::allButtons, false);
-            
-            //Can be used to make it have the native title bar, but this does remove the ability to change input and output devices. Could potentially make a place to change them in settings?
-            //window->setUsingNativeTitleBar(true);
+
+            //Use the native title bar. I've made a button in the settings panel to open the audio/midi settings window
+            window->setUsingNativeTitleBar(true);
         }
     }
 }

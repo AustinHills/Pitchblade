@@ -2,6 +2,11 @@
 
 #include "Pitchblade/panels/SettingsPanel.h"
 
+//Make sure that it has this if it's standalone
+#if JUCE_STANDALONE_APPLICATION
+ #include <juce_audio_plugin_client/Standalone/juce_StandaloneFilterWindow.h>
+#endif
+
 SettingsPanel::SettingsPanel(AudioPluginAudioProcessor& p) : processor(p) {
     //Framerate label
     framerateLabel.setText("Graph FPS:", juce::dontSendNotification);
@@ -15,6 +20,22 @@ SettingsPanel::SettingsPanel(AudioPluginAudioProcessor& p) : processor(p) {
 
     //Attach menu to parameter
     framerateAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(processor.apvts, "GLOBAL_FRAMERATE", framerateDropDown);
+
+    //Configure the Audio Settings button
+    addAndMakeVisible(audioSettingsButton);
+    audioSettingsButton.setColour(juce::TextButton::buttonColourId, Colors::button);
+    audioSettingsButton.setColour(juce::TextButton::textColourOffId, Colors::buttonText);
+    
+    // Only show/enable this button if we are actually in Standalone mode
+    audioSettingsButton.setVisible(juce::JUCEApplication::isStandaloneApp());
+
+    audioSettingsButton.onClick = [] {
+        #if JUCE_STANDALONE_APPLICATION
+            // This opens the standard Audio/MIDI settings dialog
+            if (auto* holder = juce::StandalonePluginHolder::getInstance())
+                holder->showAudioSettingsDialog();
+        #endif
+    };
 }
 
 SettingsPanel::~SettingsPanel(){}
@@ -49,6 +70,12 @@ void SettingsPanel::resized(){
     //Layout of UI elements
     auto area = getLocalBounds();
     area.removeFromTop(50);
+
+    //Position the Audio Settings button above the framerate dropdown
+    audioSettingsButton.setBounds(area.removeFromTop(40).reduced(20, 0));
+
+    area.removeFromTop(10); 
+
     auto framerateArea = area.removeFromTop(40).reduced(20,0);
 
     framerateLabel.setBounds(framerateArea.removeFromLeft(framerateArea.getWidth()/3));

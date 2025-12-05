@@ -26,6 +26,8 @@ private:
     juce::ComboBox framerateDropDown;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> framerateAttachment;
 
+    juce::TextButton audioSettingsButton { "Audio Settings" };
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SettingsPanel)
 public:
     //Constructor
