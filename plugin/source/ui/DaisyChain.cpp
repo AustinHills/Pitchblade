@@ -16,6 +16,8 @@
 #include "Pitchblade/panels/PitchPanel.h"
 #include "Pitchblade/panels/EqualizerPanel.h"
 
+#include "Pitchblade/panels/VST3Panel.h"
+
 #include "Pitchblade/panels/EffectNode.h"
 
 // helper to make unique effect names when adding/duplicating
@@ -182,6 +184,7 @@ void DaisyChain::rebuild() {
         row->canDrag = [this]() { return !isReorderLocked(); };
         // close overlays and unlock when the user releases on the chain
         row->onAnyInteraction = [this]() {
+
                 if (onItemMouseUp) onItemMouseUp();   // forward to editor
             };
 
@@ -671,7 +674,8 @@ void DaisyChain::showAddMenu() {
     menu.addItem(5, "De-Noiser");
     menu.addItem(6, "Formant",  !formantExists);    // disable when one already exists
     menu.addItem(7, "Pitch",    !pitchExists);
-    menu.addItem(8, "Equalizer");;
+    menu.addItem(8, "Equalizer");
+    menu.addItem(9, "VST3");
 
 	// set look and feel
     menu.setLookAndFeel(&getLookAndFeel());
@@ -696,6 +700,7 @@ void DaisyChain::showAddMenu() {
         case 6: newNode = std::make_shared<FormantNode>(processorRef); break;
         case 7: newNode = std::make_shared<PitchNode>(processorRef); break;
         case 8: newNode = std::make_shared<EqualizerNode>(processorRef); break;
+        case 9: newNode = std::make_shared<VST3Node>(processorRef); break;
         }
         if (!newNode) return;
 

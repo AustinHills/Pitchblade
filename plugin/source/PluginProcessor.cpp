@@ -13,6 +13,8 @@
 //hayley
 #include "Pitchblade/panels/PitchPanel.h"
 
+#include "Pitchblade/panels/VST3Panel.h"
+
 //==============================================================================
 // Constructor: sets up the plugin's audio input/output, creates all parameter definitions,
 // and initializes the ValueTree used to store the effect chain state for saving/loading 
@@ -320,7 +322,8 @@ void AudioPluginAudioProcessor::loadPresetFromFile(const juce::File& file) {
         else if (name == "DeNoiserNode")    node = std::make_shared<DeNoiserNode>(*this);
         else if (name == "EqualizerNode")   node = std::make_shared<EqualizerNode>(*this);  
         else if (name == "PitchNode")       node = std::make_shared<PitchNode>(*this);
-        else if (name == "FormantNode")     node = std::make_shared<FormantNode>(*this);
+        else if (name == "FormantNode")     node = std::make_shared<FormantNode>(*this);\
+        else if (name == "VST3Node")     node = std::make_shared<VST3Node>(*this);
         else continue;
 
         //load node list

@@ -84,6 +84,7 @@ target_sources(${PROJECT_NAME}
         source/panels/DeNoiserPanel.cpp
         source/panels/SettingsPanel.cpp
         source/panels/EqualizerPanel.cpp
+        source/panels/VST3Panel.cpp
 
         source/effects/GainProcessor.cpp
         source/effects/NoiseGateProcessor.cpp
@@ -141,6 +142,7 @@ target_compile_definitions(${PROJECT_NAME}
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
         JUCE_VST3_CAN_REPLACE_VST2=0
+        JUCE_PLUGINHOST_VST3=1
 )
 
 if(MSVC)
