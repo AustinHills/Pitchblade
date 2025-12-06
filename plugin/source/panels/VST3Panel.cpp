@@ -320,9 +320,27 @@ void VST3Node::syncFromGlobalCache() {
 }
 
 void VST3Node::process(AudioPluginAudioProcessor& proc, juce::AudioBuffer<float>& buffer) {
-    if (hostedPlugin && !bypassed) {
-        juce::MidiBuffer midi;
-        hostedPlugin->processBlock(buffer, midi);
+    //Fix a race condition crash
+    std::unique_lock<std::recursive_mutex> lock(proc.getMutex(), std::try_to_lock);
+    
+    if (lock.owns_lock()) {
+        if (hostedPlugin && !bypassed) {
+            juce::MidiBuffer midi;
+            
+            // Determine the maximum channels the plugin can handle
+            int maxCh = hostedPlugin->getTotalNumInputChannels();
+            
+            // Use the smaller of: Host Channels (buffer) OR Plugin Channels
+            int numCh = std::min(buffer.getNumChannels(), maxCh);
+
+            if (numCh > 0) {
+                // Create a proxy buffer that only exposes the safe channels
+                // This does NOT copy audio, it just points to the existing data
+                juce::AudioBuffer<float> proxy(buffer.getArrayOfWritePointers(), numCh, buffer.getNumSamples());
+                
+                hostedPlugin->processBlock(proxy, midi);
+            }
+        }
     }
     
     //Calculate level for visualizer
@@ -391,6 +409,12 @@ void VST3Node::loadPluginById(const juce::String& pluginId) {
 
 void VST3Node::finishLoad(std::unique_ptr<juce::AudioPluginInstance> instance, const juce::String& errorMsg, const juce::String& preferredName) {
     if (instance) {
+
+        if (activeWindow) {
+            activeWindow->setVisible(false);
+            delete activeWindow.getComponent();
+        }
+
         const juce::String oldName = effectName;
         // Start with the plugin's reported name
         juce::String baseRawName = preferredName.isNotEmpty() ? preferredName : instance->getName();
@@ -398,8 +422,6 @@ void VST3Node::finishLoad(std::unique_ptr<juce::AudioPluginInstance> instance, c
         // Thread safe rename logic
         {
             std::lock_guard<std::recursive_mutex> lock(processor.getMutex());
-            
-            // --- NEW: Generate Unique Name ---
             
             // 1. Clean the base name (remove trailing numbers to avoid "Synth 1 2")
             juce::String cleanBase = baseRawName.trim();
@@ -446,21 +468,29 @@ void VST3Node::finishLoad(std::unique_ptr<juce::AudioPluginInstance> instance, c
                 if(r.left == oldName) { r.left = uniqueName; changed = true; }
                 if(r.right == oldName) { r.right = uniqueName; changed = true; }
             }
-            
+
+            auto layout = processor.getBusesLayout();
+            if (instance->checkBusesLayoutSupported(layout)) {
+                instance->setBusesLayout(layout);
+            } else {
+                // If strictly mono, this will fail silently, which is fine
+                // because we handle it in process() below.
+            }
+
+            double sr = processor.getSampleRate();
+            int bs = processor.getBlockSize();
+            if (sr <= 0) sr = 44100.0;
+            if (bs <= 0) bs = 512;
+
             hostedPlugin = std::move(instance);
             
             // Apply the unique name
             setDisplayName(uniqueName); 
             loadedPluginName = uniqueName;
-            
-            hostedPlugin->prepareToPlay(44100.0, 512);
+
+            hostedPlugin->prepareToPlay(sr, bs);
 
             if(changed) processor.requestLayout(rows);
-        }
-
-        if (activeWindow) {
-            activeWindow->setVisible(false);
-            delete activeWindow.getComponent();
         }
     } else {
         juce::NativeMessageBox::showMessageBoxAsync(juce::AlertWindow::WarningIcon, "Load Failed", errorMsg);
