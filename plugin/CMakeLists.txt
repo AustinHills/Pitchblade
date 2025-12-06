@@ -38,8 +38,8 @@ juce_add_plugin(${PROJECT_NAME}
     
 
     # VERSION ...                               # Set this if the plugin version is different to the project version
-    # ICON_BIG ...                              # ICON_* arguments specify a path to an image file to use as an icon for the Standalone
-    # ICON_SMALL ...
+    ICON_BIG "assets/pb_logo.png"
+    ICON_SMALL "assets/pb_logo.png"
     COMPANY_NAME "WSU PITCHBLADE TEAM"          # Specify the name of the plugin's author
     BUNDLE_ID "com.WSUPitchbladeTeam.Pitchblade"    #for mac functionality, ios hosts will reject bundle IDs with spaces
     IS_SYNTH FALSE                              # Is this a synth or an effect?
