@@ -16,17 +16,26 @@
 #include "Pitchblade/panels/VST3Panel.h"
 
 #include <csignal>
+#include <exception>
+
 #if JUCE_WINDOWS
  #include <windows.h>
  #include <dbghelp.h>
  #pragma comment(lib, "Dbghelp.lib")
 #else
- #include <unistd.h> // REQUIRED for getpid() on Mac/Linux
+ #include <unistd.h>
 #endif
 
+// 1. The Core Reporter (Unchanged)
 void handleCrash(const juce::String& source)
 {
-    // 1. Get Process ID (Safe/Platform Specific)
+    // ... (Keep your existing handleCrash code exactly as it was) ...
+    // Note: I am omitting the body here for brevity, but you must keep 
+    // the file writing and MessageBox logic from the previous step.
+    
+    // --- INSERT YOUR handleCrash BODY HERE ---
+    
+    // Quick copy for safety if you need it:
     int pid = 0;
     #if JUCE_WINDOWS
         pid = (int)GetCurrentProcessId();
@@ -34,8 +43,7 @@ void handleCrash(const juce::String& source)
         pid = (int)getpid();
     #endif
 
-    // 2. Generate Report Content
-    juce::String report = "Pitchblade Crash Report (" + source + ")\n";
+    juce::String report = "Pitchblade Crash Report [" + source + "]\n";
     report += "--------------------------------------------------\n";
     report += "Time: " + juce::Time::getCurrentTime().toString(true, true) + "\n";
     report += "OS: " + juce::SystemStats::getOperatingSystemName() + "\n";
@@ -44,52 +52,64 @@ void handleCrash(const juce::String& source)
     report += "Stack Trace:\n";
     report += juce::SystemStats::getStackBacktrace();
 
-    // 3. Save to Documents/Pitchblade/Crash_Reports (Try/Catch for safety)
     try {
         juce::File docsDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory);
         juce::File crashDir = docsDir.getChildFile("Pitchblade").getChildFile("Crash_Reports");
-        
-        if (crashDir.createDirectory().wasOk())
-        {
+        if (crashDir.createDirectory().wasOk()) {
             juce::String filename = "Crash_" + juce::Time::getCurrentTime().formatted("%Y-%m-%d_%H-%M-%S") + ".txt";
             crashDir.getChildFile(filename).replaceWithText(report);
         }
-    }
-    catch (...) {}
+    } catch (...) {}
 
-    // 4. Show Window (Use native APIs where possible for safety)
-    juce::String msg = "Pitchblade has crashed.\nA report has been saved to My Documents/Pitchblade/Crash_Reports.";
-    
+    juce::String msg = "Pitchblade has encountered a fatal error (" + source + ").\nA report has been saved.";
     #if JUCE_WINDOWS
         ::MessageBoxA(nullptr, msg.toRawUTF8(), "Pitchblade Crash Reporter", MB_OK | MB_ICONERROR);
     #else
         juce::NativeMessageBox::showMessageBoxAsync(juce::AlertWindow::WarningIcon, "Pitchblade Crash", msg);
-        // Sleep to ensure the message box has time to appear before the process dies completely
         juce::Thread::sleep(3000); 
     #endif
 }
 
 #if JUCE_WINDOWS
-LONG WINAPI WindowsUnhandledExceptionFilter(EXCEPTION_POINTERS* /*pExceptionInfo*/)
+// --- VECTORED EXCEPTION HANDLER (The Workaround) ---
+// This runs BEFORE any VST3 plugin can hide the crash.
+LONG WINAPI VectoredCrashHandler(PEXCEPTION_POINTERS pExceptionInfo)
 {
-    handleCrash("Windows SEH");
-    return EXCEPTION_EXECUTE_HANDLER; // Proceed to terminate
-}
-#else
-void PosixSignalHandler(int signum)
-{
-    handleCrash("Signal " + juce::String(signum));
-    std::_Exit(signum); 
+    DWORD code = pExceptionInfo->ExceptionRecord->ExceptionCode;
+
+    // IGNORE these common non-fatal exceptions:
+    // 0x406D1388: SetThreadName (Used by debuggers)
+    // 0xE06D7363: C++ Exception (Used for normal control flow in plugins)
+    // 0x40010006: OutputDebugString
+    if (code == 0x406D1388 || code == 0xE06D7363 || code == 0x40010006) 
+        return EXCEPTION_CONTINUE_SEARCH;
+
+    // CATCH these fatal errors:
+    // 0xC0000005: Access Violation (The big one)
+    // 0xC00000FD: Stack Overflow (Common in audio plugins)
+    // 0xC000001D: Illegal Instruction
+    // 0xC0000094: Integer Divide by Zero
+    if (code == 0xC0000005 || code == 0xC00000FD || code == 0xC000001D || code == 0xC0000094)
+    {
+        handleCrash("Vectored Handler - Code: 0x" + juce::String::toHexString((int)code));
+        
+        // We do NOT return EXCEPTION_EXECUTE_HANDLER here because that would 
+        // stop the debugger from seeing it. We just log and let it die.
+        return EXCEPTION_CONTINUE_SEARCH; 
+    }
+
+    return EXCEPTION_CONTINUE_SEARCH;
 }
 #endif
-// -----------------------------
 
-// --- IMPLEMENT FORCE CRASH ---
-void AudioPluginAudioProcessor::forceCrash()
-{
-    // Create a "Hard" crash (Access Violation) that cannot be ignored
-    volatile int* crashPtr = nullptr;
-    *crashPtr = 42; 
+void TerminateHandler() { 
+    handleCrash("std::terminate"); 
+    std::abort(); 
+}
+
+void StandardSignalHandler(int signum) {
+    handleCrash("Signal " + juce::String(signum));
+    std::_Exit(signum); 
 }
 
 //==============================================================================
@@ -112,12 +132,18 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
     // automation and preset saving
     apvts(*this, &undoManager, "Parameters", createParameterLayout()) {
 
+    std::set_terminate(TerminateHandler);
+
     #if JUCE_WINDOWS
-        SetUnhandledExceptionFilter(WindowsUnhandledExceptionFilter);
-    #else
-        signal(SIGSEGV, PosixSignalHandler);
-        signal(SIGABRT, PosixSignalHandler);
-        signal(SIGFPE, PosixSignalHandler);
+        // Register Vectored Handler as FIRST PRIORITY (1)
+        // This overrides any VST3 plugin's attempt to hide the crash.
+        AddVectoredExceptionHandler(1, VectoredCrashHandler);
+    #endif
+
+    signal(SIGABRT, StandardSignalHandler);
+    signal(SIGFPE,  StandardSignalHandler);
+    #if !JUCE_WINDOWS
+        signal(SIGSEGV, StandardSignalHandler);
     #endif
 
 	    // check if effectNodes tree exists

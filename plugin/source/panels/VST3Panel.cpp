@@ -389,25 +389,70 @@ void VST3Node::loadPluginById(const juce::String& pluginId) {
     );
 }
 
-void VST3Node::finishLoad(std::unique_ptr<juce::AudioPluginInstance> instance, const juce::String& errorMsg) {
+void VST3Node::finishLoad(std::unique_ptr<juce::AudioPluginInstance> instance, const juce::String& errorMsg, const juce::String& preferredName) {
     if (instance) {
         const juce::String oldName = effectName;
-        const juce::String newName = instance->getName();
+        // Start with the plugin's reported name
+        juce::String baseRawName = preferredName.isNotEmpty() ? preferredName : instance->getName();
         
-        //Thread safe rename logic
+        // Thread safe rename logic
         {
             std::lock_guard<std::recursive_mutex> lock(processor.getMutex());
             
+            // --- NEW: Generate Unique Name ---
+            
+            // 1. Clean the base name (remove trailing numbers to avoid "Synth 1 2")
+            juce::String cleanBase = baseRawName.trim();
+            int lastSpace = cleanBase.lastIndexOfChar(' ');
+            if (lastSpace > 0) {
+                juce::String suffix = cleanBase.substring(lastSpace + 1);
+                bool isNumber = true;
+                for (auto c : suffix) 
+                    if (!juce::CharacterFunctions::isDigit(c)) isNumber = false;
+                
+                if (isNumber) 
+                    cleanBase = cleanBase.substring(0, lastSpace);
+            }
+
+            // 2. Find a unique name
+            juce::String uniqueName = cleanBase;
+            int counter = 2;
+
+            auto nameExists = [&](const juce::String& name) {
+                const auto& nodes = processor.getEffectNodes();
+                for (auto& n : nodes) {
+                    // Check for name match, but IGNORE 'this' node 
+                    // (we don't want to conflict with ourselves)
+                    if (n && n->effectName == name && n.get() != this)
+                        return true;
+                }
+                return false;
+            };
+
+            // If base name is taken, append numbers until unique
+            if (nameExists(uniqueName)) {
+                 while (nameExists(cleanBase + " " + juce::String(counter)))
+                     counter++;
+                 uniqueName = cleanBase + " " + juce::String(counter);
+            }
+
+            // --- End Unique Name Generation ---
+
+            // 3. Update the Layout Rows with the new unique name
             auto rows = processor.getCurrentLayoutRows();
             bool changed = false;
             for(auto& r : rows) {
-                if(r.left == oldName) { r.left = newName; changed = true; }
-                if(r.right == oldName) { r.right = newName; changed = true; }
+                // We update the row that contained our 'oldName' to the new 'uniqueName'
+                if(r.left == oldName) { r.left = uniqueName; changed = true; }
+                if(r.right == oldName) { r.right = uniqueName; changed = true; }
             }
             
             hostedPlugin = std::move(instance);
-            setDisplayName(newName); 
-            loadedPluginName = newName;
+            
+            // Apply the unique name
+            setDisplayName(uniqueName); 
+            loadedPluginName = uniqueName;
+            
             hostedPlugin->prepareToPlay(44100.0, 512);
 
             if(changed) processor.requestLayout(rows);
@@ -483,24 +528,36 @@ std::unique_ptr<juce::XmlElement> VST3Node::toXml() const {
 }
 
 void VST3Node::loadFromXml(const juce::XmlElement& xml) {
-    //Initialize hosting to populate the knownPluginList
+    // Initialize hosting to populate the knownPluginList
     initializeHosting();
 
-    //Use the name
+    // Get the display name (e.g. "Serum 2") and the ID
     juce::String name = xml.getStringAttribute("name");
+    juce::String pluginId = xml.getStringAttribute("pluginId");
     
-    //Decode the state
+    // Decode the state
     juce::MemoryBlock state;
     if (xml.hasAttribute("state")) {
         state.fromBase64Encoding(xml.getStringAttribute("state"));
     }
 
-    //Iterate the loaded plugin list and find the one that matches the name.
     juce::PluginDescription desc;
     bool found = false;
 
-    if (name.isNotEmpty()) {
+    // 1. Try to find by unique Plugin ID (Reliable)
+    if (pluginId.isNotEmpty()) {
+        // [FIX] Changed 'auto*' to 'auto' because getTypeForIdentifierString returns a unique_ptr
+        if (auto type = knownPluginList.getTypeForIdentifierString(pluginId)) {
+            desc = *type;
+            found = true;
+        }
+    }
+
+    // 2. Fallback: Find by name
+    if (!found && name.isNotEmpty()) {
         const auto& types = knownPluginList.getTypes();
+        
+        // A. Try Exact Match
         for (const auto& type : types) { 
             if (type.name == name) {
                 desc = type;
@@ -508,18 +565,43 @@ void VST3Node::loadFromXml(const juce::XmlElement& xml) {
                 break;
             }
         }
+
+        // B. Try Stripped Name (e.g. find "Serum" if saved as "Serum 2")
+        if (!found) {
+            juce::String cleanName = name.trim();
+            int lastSpace = cleanName.lastIndexOfChar(' ');
+            if (lastSpace > 0) {
+                juce::String suffix = cleanName.substring(lastSpace + 1);
+                bool isNumber = true;
+                for (auto c : suffix) 
+                    if (!juce::CharacterFunctions::isDigit(c)) isNumber = false;
+
+                if (isNumber) {
+                    juce::String baseName = cleanName.substring(0, lastSpace);
+                    for (const auto& type : types) {
+                        if (type.name == baseName) {
+                            desc = type;
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     if (found) {
-        // Async Load the found description
+        // Async Load
         std::weak_ptr<VST3Node> weakSelf = std::dynamic_pointer_cast<VST3Node>(shared_from_this());
 
+        // We capture 'name' to pass it as the preferred name
         formatManager->createPluginInstanceAsync(desc, 44100.0, 512, 
-            [weakSelf, state](std::unique_ptr<juce::AudioPluginInstance> instance, const juce::String& error) mutable {
+            [weakSelf, state, name](std::unique_ptr<juce::AudioPluginInstance> instance, const juce::String& error) mutable {
                 if (auto self = weakSelf.lock()) {
-                    self->finishLoad(std::move(instance), error);
+                    // Pass 'name' as preferredName so we restore "Serum 2" correctly
+                    self->finishLoad(std::move(instance), error, name);
                     
-                    //Apply state if load succeeded
+                    // Apply state if load succeeded
                     if (self->hostedPlugin && state.getSize() > 0) {
                         self->hostedPlugin->setStateInformation(state.getData(), (int)state.getSize());
                     }

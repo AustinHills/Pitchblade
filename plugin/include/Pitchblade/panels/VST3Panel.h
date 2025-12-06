@@ -154,7 +154,7 @@ private:
     juce::Component::SafePointer<juce::DocumentWindow> activeWindow;
     
     //Helper to finish loading on MessageThread
-    void finishLoad(std::unique_ptr<juce::AudioPluginInstance> instance, const juce::String& errorMsg);
+    void finishLoad(std::unique_ptr<juce::AudioPluginInstance> instance, const juce::String& errorMsg, const juce::String& preferredName = {});
     
     friend class ScannerThread;
 };
