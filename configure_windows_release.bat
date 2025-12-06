@@ -10,8 +10,8 @@ ECHO "Configuring CMake..."
 cmake "-S" "." "-B" "build" "-G" "Visual Studio 17 2022" "-A" "x64" "-T" "host=x64"
 
 ECHO "Building plugin..."
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake "--build" "build" --config Release --target Pitchblade_All
+cmake -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
+cmake "--build" "build" --config RelWithDebInfo --target Pitchblade_All
 
 REM --- Check if build was successful ---
 IF %ERRORLEVEL% NEQ 0 (

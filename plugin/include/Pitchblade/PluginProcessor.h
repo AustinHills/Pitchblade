@@ -116,6 +116,8 @@ public:
     //Undo/Redo stuff
     juce::UndoManager undoManager;
 
+    void forceCrash();
+
 private:
     //============================================================================== 
     //processors

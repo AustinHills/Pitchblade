@@ -15,6 +15,83 @@
 
 #include "Pitchblade/panels/VST3Panel.h"
 
+#include <csignal>
+#if JUCE_WINDOWS
+ #include <windows.h>
+ #include <dbghelp.h>
+ #pragma comment(lib, "Dbghelp.lib")
+#else
+ #include <unistd.h> // REQUIRED for getpid() on Mac/Linux
+#endif
+
+void handleCrash(const juce::String& source)
+{
+    // 1. Get Process ID (Safe/Platform Specific)
+    int pid = 0;
+    #if JUCE_WINDOWS
+        pid = (int)GetCurrentProcessId();
+    #else
+        pid = (int)getpid();
+    #endif
+
+    // 2. Generate Report Content
+    juce::String report = "Pitchblade Crash Report (" + source + ")\n";
+    report += "--------------------------------------------------\n";
+    report += "Time: " + juce::Time::getCurrentTime().toString(true, true) + "\n";
+    report += "OS: " + juce::SystemStats::getOperatingSystemName() + "\n";
+    report += "Process ID: " + juce::String(pid) + "\n";
+    report += "--------------------------------------------------\n";
+    report += "Stack Trace:\n";
+    report += juce::SystemStats::getStackBacktrace();
+
+    // 3. Save to Documents/Pitchblade/Crash_Reports (Try/Catch for safety)
+    try {
+        juce::File docsDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory);
+        juce::File crashDir = docsDir.getChildFile("Pitchblade").getChildFile("Crash_Reports");
+        
+        if (crashDir.createDirectory().wasOk())
+        {
+            juce::String filename = "Crash_" + juce::Time::getCurrentTime().formatted("%Y-%m-%d_%H-%M-%S") + ".txt";
+            crashDir.getChildFile(filename).replaceWithText(report);
+        }
+    }
+    catch (...) {}
+
+    // 4. Show Window (Use native APIs where possible for safety)
+    juce::String msg = "Pitchblade has crashed.\nA report has been saved to My Documents/Pitchblade/Crash_Reports.";
+    
+    #if JUCE_WINDOWS
+        ::MessageBoxA(nullptr, msg.toRawUTF8(), "Pitchblade Crash Reporter", MB_OK | MB_ICONERROR);
+    #else
+        juce::NativeMessageBox::showMessageBoxAsync(juce::AlertWindow::WarningIcon, "Pitchblade Crash", msg);
+        // Sleep to ensure the message box has time to appear before the process dies completely
+        juce::Thread::sleep(3000); 
+    #endif
+}
+
+#if JUCE_WINDOWS
+LONG WINAPI WindowsUnhandledExceptionFilter(EXCEPTION_POINTERS* /*pExceptionInfo*/)
+{
+    handleCrash("Windows SEH");
+    return EXCEPTION_EXECUTE_HANDLER; // Proceed to terminate
+}
+#else
+void PosixSignalHandler(int signum)
+{
+    handleCrash("Signal " + juce::String(signum));
+    std::_Exit(signum); 
+}
+#endif
+// -----------------------------
+
+// --- IMPLEMENT FORCE CRASH ---
+void AudioPluginAudioProcessor::forceCrash()
+{
+    // Create a "Hard" crash (Access Violation) that cannot be ignored
+    volatile int* crashPtr = nullptr;
+    *crashPtr = 42; 
+}
+
 //==============================================================================
 // Constructor: sets up the plugin's audio input/output, creates all parameter definitions,
 // and initializes the ValueTree used to store the effect chain state for saving/loading 
@@ -34,6 +111,15 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
     // It owns every parameter defined in createParameterLayout and handles
     // automation and preset saving
     apvts(*this, &undoManager, "Parameters", createParameterLayout()) {
+
+    #if JUCE_WINDOWS
+        SetUnhandledExceptionFilter(WindowsUnhandledExceptionFilter);
+    #else
+        signal(SIGSEGV, PosixSignalHandler);
+        signal(SIGABRT, PosixSignalHandler);
+        signal(SIGFPE, PosixSignalHandler);
+    #endif
+
 	    // check if effectNodes tree exists
         // branch stores the layout of the DaisyChain - effect ordering,
         // unique IDs, and all ValueTrees belonging to each EffectNode

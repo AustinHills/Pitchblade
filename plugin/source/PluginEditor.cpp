@@ -519,6 +519,10 @@ void AudioPluginAudioProcessorEditor::buttonClicked(juce::Button* button){
         //Toggle state
         isShowingSettings = !isShowingSettings;
 
+        //This allows you to force a crash
+        // processorRef.forceCrash();
+        // return;
+
         // reyna - updated how daisychain will lock 
 		// Lock or unlock daisychain reordering based on settings visibility
         if (!isLockBypassActive) {
