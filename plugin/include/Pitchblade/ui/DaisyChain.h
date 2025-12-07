@@ -19,7 +19,7 @@
 #include "Pitchblade/panels/EffectNode.h"
 
 //sidebar component showing the chain of effects
-class DaisyChain : public juce::Component {
+class DaisyChain : public juce::Component, public juce::ValueTree::Listener {
 public:
     DaisyChain(AudioPluginAudioProcessor& proc, std::vector<std::shared_ptr<EffectNode>>& nodes);
 
@@ -40,15 +40,10 @@ public:
     };
 
     // helper accessors
-    const std::vector<Row>& getCurrentLayout() const { return rows; }   // new layout model
+    const std::vector<Row>& getCurrentLayout() const;  // new layout model
     std::vector<juce::String> getCurrentOrder() const;                  // flatten rows for old API
 
 	juce::OwnedArray<DaisyChainItem> items; // ui rows
-
-    //setter getter for rows
-    void setRows(const std::vector<Row>& newRows) {  rows = newRows; rebuild(); }
-    std::vector<Row> getRows() const {  return rows; }
-    void clearRows() { rows.clear(); }
 
 	//add + copy buttons
     juce::TextButton addButton{ "Add" };
@@ -85,6 +80,11 @@ public:
         return items[index];
     }
 
+    // Listen to the APVTS to update UI
+    void valueTreeChildAdded(juce::ValueTree&, juce::ValueTree&) override { rebuild(); }
+    void valueTreeChildRemoved(juce::ValueTree&, juce::ValueTree&, int) override { rebuild(); }
+    void valueTreeChildOrderChanged(juce::ValueTree&, int, int) override { rebuild(); }
+
 //private:
 	// reorder handler for multi row support
     // kind: -1 vertical insert, -2 right-slot insert (double row)
@@ -94,7 +94,6 @@ public:
     std::vector<std::shared_ptr<EffectNode>>& effectNodes;                      // refern to processor's chain
 
 private:
-	std::vector<Row> rows;              // current layout model
 	juce::Viewport scrollArea;          // scroll area for daisy chain
 	juce::Component effectsContainer;   // container for effect items
 	bool globalBypassed = false;        // global bypass state

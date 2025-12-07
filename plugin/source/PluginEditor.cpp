@@ -211,70 +211,46 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
                 setActiveEffectByName(effectName);
             };
     }
-        //keeps daiychain ui reordering consistant with processor ////////////////////////////
-        daisyChain.onReorderFinished = [this]() {
-            // new API for multiple rows - get current UI layout and send it to the processor
-            const auto& rows = daisyChain.getCurrentLayout();       // get current layout
-            std::vector<AudioPluginAudioProcessor::Row> procRows;   // prepare processing rows
-            procRows.reserve(rows.size());
-            for (const auto& r : rows) {                            // convert to processing rows
-                procRows.push_back({ r.left, r.right });
-            }
-            processorRef.requestLayout(procRows);                       // request layout update
+    // The processor is ALREADY updated by the UndoManager/ValueTree listener.
+    // We only need to refresh visualizers and tooltips here.
+    daisyChain.onReorderFinished = [this]() {
+        // 1. Close overlays
+        if (auto* editor = dynamic_cast<AudioPluginAudioProcessorEditor*>(getTopLevelComponent())) {
+            if (editor->isPresetsVisible())
+                editor->closeOverlaysIfOpen();
+        }
 
-            // close presets if open - reyna
-            if (auto* editor = dynamic_cast<AudioPluginAudioProcessorEditor*>(getTopLevelComponent())) {
-                if (editor->isPresetsVisible())
-                    editor->closeOverlaysIfOpen();
-            }
+        // 2. Refresh Visualizer references (since nodes might have moved/changed)
+        visualizer.clearVisualizer();
 
-            visualizer.clearVisualizer();   // safely clear old node references
-            // reconnect buttons after reorder
-            for (int i = 0; i < daisyChain.items.size(); ++i) {
-                // for single and double rows
-                if (auto* row = daisyChain.items[i]) {
-                    const juce::String leftName = row->getName();
-                    // LEFT btn
-                    row->button.onClick = [this, leftName]() {
-                        closeOverlaysIfOpen();
-                        std::lock_guard<std::recursive_mutex> lg(processorRef.getMutex());
-                        auto& nodes = processorRef.getEffectNodes();
+        // 3. Reconnect Buttons (UI Logic only)
+        for (int i = 0; i < daisyChain.items.size(); ++i) {
+            if (auto* row = daisyChain.items[i]) {
+                const juce::String leftName = row->getName();
+                
+                // LEFT btn
+                row->button.onClick = [this, leftName]() {
+                    closeOverlaysIfOpen();
+                    std::lock_guard<std::recursive_mutex> lg(processorRef.getMutex());
+                    auto& nodes = processorRef.getEffectNodes();
 
-                        for (int n = 0; n < (int)nodes.size(); ++n) {
-                            if (nodes[n] && nodes[n]->effectName == leftName) {
-                                effectPanel.showEffect(n);
-                                visualizer.showVisualizer(n);
-                                activeEffectIndex = n;
-                                break;
-                            }
+                    for (int n = 0; n < (int)nodes.size(); ++n) {
+                        if (nodes[n] && nodes[n]->effectName == leftName) {
+                            effectPanel.showEffect(n);
+                            visualizer.showVisualizer(n);
+                            activeEffectIndex = n;
+                            break;
                         }
+                    }
+                    setActiveEffectByName(leftName);
+                };
 
-                        //Austin
-                        //If the settings panel is open, then close it and reopen the proper thing in the daisy chain
-                        if (isShowingSettings) {
-                            isShowingSettings = false;
-                            settingsPanel.setVisible(false);
-
-                            visualizer.setVisible(true);
-                            effectPanel.setVisible(true);
-                        }
-
-                        // reyna presets panel. close if open daisychain
-                        if (isShowingPresets) {
-                            isShowingPresets = false;
-                            presetsPanel.setVisible(false);
-                            visualizer.setVisible(true);
-                            effectPanel.setVisible(true);
-                        }
-                        setActiveEffectByName(leftName);
-                        };
-
-                    // RIGHT btn
+                // RIGHT btn
+                if (!row->rightEffectName.isEmpty()) {
                     row->rightButton.onClick = [this, name = row->rightEffectName]() {
-                        if (name.isEmpty()) return;
+                        closeOverlaysIfOpen(); // Added close overlays here too
                         std::lock_guard<std::recursive_mutex> lg(processorRef.getMutex());
                         auto& nodes = processorRef.getEffectNodes();
-                        // find the index by name, then open that tab
                         for (int n = 0; n < (int)nodes.size(); ++n) {
                             if (nodes[n] && nodes[n]->effectName == name) {
                                 effectPanel.showEffect(n);
@@ -283,33 +259,31 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
                                 break;
                             }
                         }
+                        setActiveEffectByName(name);
                     };
                 }
-
             }
-            applyRowTooltips();     // reapply tooltips after reorder
-            if (activeEffectName.isNotEmpty())
-                setActiveEffectByName(activeEffectName);
+        }
 
-            };
+        applyRowTooltips();
+        
+        // Restore active selection highlight
+        if (activeEffectName.isNotEmpty())
+            setActiveEffectByName(activeEffectName);
+    };
             
 
-        presetsPanel.onPresetActionFinished = [this]() {
-            // keep preset page visible
-            // isShowingPresets = true;
-            // presetsPanel.setVisible(true);
-
-            //rebuild ui after preset data is updated
-            juce::MessageManager::callAsync([this]() {
-                // full UI rebuild after preset operation
-                rebuildAndSyncUI();
+    // Updated onPresetActionFinished
+    presetsPanel.onPresetActionFinished = [this]() {
+        juce::MessageManager::callAsync([this]() {
+            // Rebuild everything (Listeners will likely handle this, but this forces a clean UI state)
+            rebuildAndSyncUI();
             
-                // keep daisychain grayed out when presets panel is open
-                if (isShowingPresets) {
-                    daisyChain.setChainControlsEnabled(false);
-                }
-            });     
-        };
+            if (isShowingPresets) {
+                daisyChain.setChainControlsEnabled(false);
+            }
+        });     
+    };
     }
 
     //For undo manager
@@ -324,41 +298,29 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
     };
 }
 
-// reyna - rebuild daisy chain and effect panel ui to sync with processor
 void AudioPluginAudioProcessorEditor::rebuildAndSyncUI() {
-    //Pull fresh rows from processor before rebuilding UI
-    auto procRows = processorRef.getCurrentLayoutRows();
-    if (!procRows.empty()) {
-        daisyChain.setReorderLocked(false);
-        std::vector<DaisyChain::Row> uiRows;
-        uiRows.reserve(procRows.size());
-        for (const auto& r : procRows) {
-            uiRows.push_back({ r.left, r.right });
-        }
-        daisyChain.setRows(uiRows);
-    }
-
+    // REMOVED: procRows fetching and daisyChain.setRows(uiRows)
+    // The DaisyChain now listens to the ValueTree directly. 
+    
     std::lock_guard<std::recursive_mutex> lg(processorRef.getMutex());
-    juce::Logger::outputDebugString("Rebuilding DaisyChain + Panels");
+    // juce::Logger::outputDebugString("Rebuilding DaisyChain + Panels");
 
-    //daisyChain.resetRowsToNodes();    // rows matches current effectNodes for daisychain ui
-    daisyChain.rebuild();             // rebuild rows + reset callbacks
-    effectPanel.refreshTabs();        // rebind tab components
-    visualizer.refreshTabs();         // sync visualizers
+    // daisyChain.resetRowsToNodes(); // REMOVED
+    
+    daisyChain.rebuild();             // This now reads directly from Processor's effectNodes (which are synced to APVTS)
+    effectPanel.refreshTabs();        
+    visualizer.refreshTabs();         
     resized();                        
     repaint();
 
-    // reconnect DaisyChain buttons to EffectPanel + Visualizer
+    // Reconnect buttons (Same logic as in onReorderFinished)
     for (int i = 0; i < daisyChain.items.size(); ++i) {
         if (auto* row = daisyChain.items[i]) {
 
-            const juce::String effectName = row->getName(); // find rows left effect name
+            const juce::String effectName = row->getName(); 
             row->button.onClick = [this, effectName]() {
-
                 std::lock_guard<std::recursive_mutex> lg(processorRef.getMutex());
                 auto& nodes = processorRef.getEffectNodes();
-
-                // Find the actual effect index by its name
                 for (int n = 0; n < (int)nodes.size(); ++n) {
                     if (nodes[n] && nodes[n]->effectName == effectName) {
                         effectPanel.showEffect(n);
@@ -369,29 +331,28 @@ void AudioPluginAudioProcessorEditor::rebuildAndSyncUI() {
                     }
                 }
             };
-            // handle right side if double row
+
             if (!row->rightEffectName.isEmpty()) {
                 const juce::String rightName = row->rightEffectName;
                 row->rightButton.onClick = [this, rightName]() {
-                        auto& nodes = processorRef.getEffectNodes();
-
-                        for (int n = 0; n < (int)nodes.size(); ++n) {
-                            if (nodes[n] && nodes[n]->effectName == rightName) {
-                                effectPanel.showEffect(n);
-                                visualizer.showVisualizer(n);
-                                activeEffectIndex = n;
-                                break;
-                            }
+                    std::lock_guard<std::recursive_mutex> lg(processorRef.getMutex());
+                    auto& nodes = processorRef.getEffectNodes();
+                    for (int n = 0; n < (int)nodes.size(); ++n) {
+                        if (nodes[n] && nodes[n]->effectName == rightName) {
+                            effectPanel.showEffect(n);
+                            visualizer.showVisualizer(n);
+                            activeEffectIndex = n;
+                            break;
                         }
-                        closeOverlaysIfOpen();  
-                        setActiveEffectByName(rightName);
-                    };
+                    }
+                    setActiveEffectByName(rightName);
+                };
             }
         }
     }
     applyRowTooltips();
     
-    // Try to find the active effect by name, if not found (renamed), fallback to index
+    // Keep active selection logic (Unchanged)
     if (activeEffectName.isNotEmpty()) {
         auto& nodes = processorRef.getEffectNodes();
         bool nameFound = false;
@@ -406,10 +367,8 @@ void AudioPluginAudioProcessorEditor::rebuildAndSyncUI() {
         }
 
         if (nameFound) {
-            // Name found, update index in case it moved
             activeEffectIndex = foundIndex;
         } else {
-            // Name not found, use stored index to restore selection (handle rename)
             if (!nodes.empty()) {
                 activeEffectIndex = juce::jlimit(0, (int)nodes.size() - 1, activeEffectIndex);
                 if (nodes[activeEffectIndex]) {
@@ -418,7 +377,6 @@ void AudioPluginAudioProcessorEditor::rebuildAndSyncUI() {
             }
         }
 
-        // Apply to UI
         setActiveEffectByName(activeEffectName);
         effectPanel.showEffect(activeEffectIndex);
         visualizer.showVisualizer(activeEffectIndex);

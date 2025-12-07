@@ -146,6 +146,24 @@ VST3Panel::VST3Panel(AudioPluginAudioProcessor& proc, VST3Node& node)
 
 VST3Panel::~VST3Panel() { stopTimer(); }
 
+VST3Node::VST3Node(AudioPluginAudioProcessor& proc, const juce::ValueTree& state)
+    : EffectNode(proc, state) // Pass state to base class
+{
+    scannerThread = std::make_unique<ScannerThread>(*this);
+    fifo.resize(fftSize);
+    fftData.resize(fftSize * 2);
+    
+    // Initialize standard things
+    if (!formatManager) {
+        formatManager = std::make_unique<juce::AudioPluginFormatManager>();
+        formatManager->addDefaultFormats();
+        syncFromGlobalCache();
+    }
+    
+    // We don't load the plugin here immediately; loadFromXml (called by base) or 
+    // the layout sync will handle it.
+}
+
 void VST3Panel::updatePluginListUI()
 {
     pluginList.clear();
@@ -461,13 +479,7 @@ void VST3Node::finishLoad(std::unique_ptr<juce::AudioPluginInstance> instance, c
             // --- End Unique Name Generation ---
 
             // 3. Update the Layout Rows with the new unique name
-            auto rows = processor.getCurrentLayoutRows();
-            bool changed = false;
-            for(auto& r : rows) {
-                // We update the row that contained our 'oldName' to the new 'uniqueName'
-                if(r.left == oldName) { r.left = uniqueName; changed = true; }
-                if(r.right == oldName) { r.right = uniqueName; changed = true; }
-            }
+            getMutableNodeState().setProperty("name", uniqueName, &processor.undoManager);
 
             auto layout = processor.getBusesLayout();
             if (instance->checkBusesLayoutSupported(layout)) {
@@ -484,13 +496,10 @@ void VST3Node::finishLoad(std::unique_ptr<juce::AudioPluginInstance> instance, c
 
             hostedPlugin = std::move(instance);
             
-            // Apply the unique name
             setDisplayName(uniqueName); 
             loadedPluginName = uniqueName;
 
             hostedPlugin->prepareToPlay(sr, bs);
-
-            if(changed) processor.requestLayout(rows);
         }
     } else {
         juce::NativeMessageBox::showMessageBoxAsync(juce::AlertWindow::WarningIcon, "Load Failed", errorMsg);

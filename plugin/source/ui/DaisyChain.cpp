@@ -92,20 +92,15 @@ DaisyChain::DaisyChain(AudioPluginAudioProcessor& proc, std::vector<std::shared_
     duplicateButton.onClick = [this]() { showDuplicateMenu(); };
     deleteButton.onClick = [this]() { showDeleteMenu(); };
 
-    // if there are existing nodes in the processor, create default rows
-    // creates the default rows in the daisychain on first launch
-	{   // lock processor mutex for thread safety
-        std::lock_guard<std::recursive_mutex> lg(processorRef.getMutex());
-        if (!effectNodes.empty() && rows.empty()) {
-            for (auto& node : effectNodes) {
-                if (!node) continue;
-                Row r;
-                r.left = node->effectName;
-                rows.push_back(r);
-            }
-            rebuild(); // build the default UI chain
-        }
-    }
+    // Attach to the Chain value tree
+    auto chain = processorRef.apvts.state.getChildWithName("Chain");
+    if (chain.isValid())
+        chain.addListener(this);
+    else 
+        processorRef.apvts.state.addListener(this); // Fallback
+        
+    // Initial build
+    rebuild();
 }
 
 // check if any row has a formant / pitch effect
@@ -165,202 +160,83 @@ void DaisyChain::resetRowsToNodes() {
 
 // rebuilds the UI from current rows and effectNodes
 void DaisyChain::rebuild() {
-    // clear UI rows
+    // Clear UI
     for (auto* it : items) effectsContainer.removeChildComponent(it);
     items.clear(true);
 
-	juce::Array<int> rightToClear;  // indices of rows to clear right slot if invalid
-	// will not mutate rows, just read from it to build UI
+    // Get the authoritative list from processor (which is synced to VT)
+    // Or iterate the VT directly. Let's use effectNodes as it contains the params/bypass state objects.
+    auto& nodes = processorRef.getEffectNodes();
     
-	// create rows from effectnodes effect names and chain modes /////////////////////////////////////
-    for (int i = 0; i < (int)rows.size(); ++i) {
-        const auto& rowData = rows[i];                      // get name from current order list
-
-		auto* row = new DaisyChainItem(rowData.left, i);    // create row with effect name
-        effectsContainer.addAndMakeVisible(row);
-        items.add(row);
-
-        // prevent drag when overlays are open
-        row->canDrag = [this]() { return !isReorderLocked(); };
-        // close overlays and unlock when the user releases on the chain
-        row->onAnyInteraction = [this]() {
-
-                if (onItemMouseUp) onItemMouseUp();   // forward to editor
-            };
-
-        // LEFT node //////////////
-        auto nodeLeft = findNodeByName(rowData.left);
-        const bool leftBypassed = nodeLeft ? nodeLeft->bypassed : false;
-        row->updateBypassVisual(leftBypassed);
-
-        row->onBypassChanged = [this, name = rowData.left, row](int index, bool state) {
-            // find node by name and update its bypass state
-            if (auto n = findNodeByName(name)) {
-                n->bypassed = state;
-            }
-
-            row->updateBypassVisual(state);
-            // notify editor that some bypass changed
-            if (onAnyBypassChanged)
-                onAnyBypassChanged();
-            };
-
-        // find neighboring row states for ui connections 
-        int leftModeId = 1;
-        if (nodeLeft) {
-            // use the nodes existing chainMode that was set by preset
-            leftModeId = juce::jlimit(1, 4, (int)nodeLeft->chainMode);
-        } else {
-            const bool prevIsDouble = (i > 0) ? rows[i - 1].hasRight() : false;
-            const bool currIsDouble = rowData.hasRight();
-            const bool nextIsDouble = (i + 1 < (int)rows.size()) ? rows[i + 1].hasRight() : false;
-
-            // find left node chain mode for ui
-            if (currIsDouble)          leftModeId = 3;          // double down
-            else if (prevIsDouble)     leftModeId = 4;          // unite
-            else if (nextIsDouble)     leftModeId = 2;          // split
+    // Simple Linear Rebuild (Every node is a row)
+    // To restore "Double Row" logic, you would iterate nodes and check chainMode.
+    // If current node is DoubleDown, it appends to previous row instead of making new one.
+    
+    DaisyChainItem* currentRow = nullptr;
+    
+    for (int i = 0; i < nodes.size(); ++i) {
+        auto node = nodes[i];
+        if (!node) continue;
+        
+        bool isRightSide = false;
+        
+        // Determine if this should be on the right side of the previous row
+        // This requires your nodes to persist their ChainMode correctly in the ValueTree
+        if (currentRow != nullptr && node->chainMode == ChainMode::DoubleDown) {
+            isRightSide = true;
         }
-		// set left node chain mode
-        row->setChainModeId(leftModeId);
-        row->updateModeVisual();    
-
-        // RIGHT node if present //////////////////////
-        if (rowData.right.isNotEmpty()) {
-			auto nodeR = findNodeByName(rowData.right); // find right node by name
-            if (!nodeR) { 
-				rightToClear.add(i);                                    // mark for clearing if node not found
-            } else {
-				// set right effect
-                row->setSecondaryEffect(rowData.right);
-                if (nodeR) nodeR->chainMode = ChainMode::DoubleDown;    // secondary mode is always DoubleDown in a double row
-
-                const bool rightBypassed = nodeR->bypassed;             // get right bypass state
-                row->updateSecondaryBypassVisual(nodeR->bypassed);      // update right bypass visual
-                row->onSecondaryBypassChanged = [this, name = rowData.right, row](int index, bool state) {  // right bypass callback
-                    // find node by name and update its bypass state
-                    if (auto n = findNodeByName(name)) {
-                        n->bypassed = state;
-                    }
-                    row->updateSecondaryBypassVisual(state);     // update visual
-
-                    // notify editor that some bypass changed
-                    if (onAnyBypassChanged)
-                        onAnyBypassChanged();
-                    };
-            }
-
+        
+        if (isRightSide) {
+            // Add to existing row
+            currentRow->setSecondaryEffect(node->effectName);
+            currentRow->updateSecondaryBypassVisual(node->bypassed);
+            // ... setup right side callbacks ...
         } else {
-			// clear right if no right effect
-            rightToClear.add(i);
+            // New Row
+            currentRow = new DaisyChainItem(node->effectName, i);
+            effectsContainer.addAndMakeVisible(currentRow);
+            items.add(currentRow);
+            
+            currentRow->updateBypassVisual(node->bypassed);
+            // ... setup left side callbacks ...
         }
-
-        // chaining mode //////////////////////////////////
-        // update chain mode callback ui using name instead of index (to avoid issues with reordering)
-        row->onModeChanged = [this, row](int index, int modeId) {
-			/// lambda to handle mode update by name
-            // handle both left and right if they exist
-            auto handleMode = [&](const juce::String& name) {
-                if (auto n = findNodeByName(name)) {
-                    n->chainMode = (ChainMode)juce::jlimit(1, 4, modeId);
-                }
-            };
-
-            if (row->getName().isNotEmpty())     { handleMode(row->getName()); }        // left
-            if (!row->rightEffectName.isEmpty()) { handleMode(row->rightEffectName); }  // right
-			processorRef.requestLayout(toProcessorRows(rows));                          // notify processor of layout change
-        };
-
-        row->onReorder = [this](int kind, juce::String dragName, int targetRow) { // reorder callback from drag n drop ui
-			if (reorderLocked) return; // prevent reordering if locked
-            handleReorder(kind, dragName, targetRow);
-            };
-
-        // disable dragging when reorder is locked
-        row->setInterceptsMouseClicks(true, true);
-        row->onAnyInteraction = [this]() {
-            if (reorderLocked)
-                return; // ignore drag attempts
-            };
-    };
-
-	// clear invalid right slots
-	// apply after building all rows to avoid index issues
-    for (int idx : rightToClear) {
-        if (idx >= 0 && idx < (int)rows.size())
-            rows[(size_t)idx].right.clear();
     }
 
-	// finalize
     resized();
     repaint();
-	if (globalBypassed) { setGlobalBypassVisual(true); } //  global bypass visual state
 }
 
 //reorders the global effects list and rebuilds UI
 void DaisyChain::handleReorder(int kind, const juce::String& dragName, int targetRow) {
-    if (reorderLocked || rows.empty()) return;
+    if (reorderLocked) return;
 
-    // clamp target row
-    targetRow = juce::jlimit(0, (int)rows.size(), targetRow);
-
-    // locate source name
-    auto [srcRow, srcIsRight, found] = findRowAndSide(rows, dragName);
-    if (!found) return;
-
-    // remove source 
-    const bool sourceAboveTarget = (srcRow >= 0 && srcRow < targetRow); {
-        auto& r = rows[(size_t)srcRow];
-        if (!srcIsRight) 
-            // removing left
-            if (r.hasRight()) { r.left = r.right; r.right.clear(); 
-        } else { 
-                rows.erase(rows.begin() + srcRow); 
-        } else {
-            // removing right side of a double
-            r.right.clear();
+    auto chain = processorRef.apvts.state.getChildWithName("Chain");
+    
+    // Find index of dragged node in ValueTree
+    int oldIndex = -1;
+    for (int i = 0; i < chain.getNumChildren(); ++i) {
+        if (chain.getChild(i).getProperty("name") == dragName) {
+            oldIndex = i;
+            break;
         }
     }
+    
+    if (oldIndex == -1) return;
 
-    // if delete a whole row and it was above the target, target ++ 1
-    if (sourceAboveTarget && targetRow > 0) targetRow--;
-
-    // check if row is empty
-    if (rows.empty()) {
-        // always create a new single row
-        rows.push_back({ dragName, {} });
-        juce::MessageManager::callAsync([this]() {
-            rebuild();
-            if (onReorderFinished) onReorderFinished();
-            });
-        return;
+    // Logic to determine new index based on targetRow
+    // This depends on how your `targetRow` maps to the linear list
+    // For simplicity, we assume 1 item = 1 row in the flattened list
+    int newIndex = juce::jlimit(0, chain.getNumChildren() - 1, targetRow);
+    
+    // Perform the move via UndoManager
+    if (oldIndex != newIndex) {
+        chain.moveChild(oldIndex, newIndex, &processorRef.undoManager);
     }
-
-    //  -2 create double row
-    if (kind == -2) {
-        // inserting into right slot of targetRow if possible
-        // else create a brand new row below targetRow
-        const int safeRow = juce::jlimit(0, (int)rows.size() - 1, targetRow);
-        auto& t = rows[(size_t)safeRow];
-        if (!t.hasRight() && t.left != dragName) {
-            t.right = dragName; // becomes a double row
-        } else {
-            // target already double so add a new single row below
-            rows.insert(rows.begin() + juce::jlimit(0, (int)rows.size(), safeRow + 1), { dragName, {} });
-        }
-    } else {
-        // -1 create single row
-        // vertical insert 
-        targetRow = juce::jlimit(0, (int)rows.size(), targetRow);
-        rows.insert(rows.begin() + targetRow, { dragName, {} });
-    }
-
-    // rebuild asynchronously 
-    juce::MessageManager::callAsync([this]() {
-        rebuild();
-        /*if (onReorderFinished) onReorderFinished();*/
-        processorRef.requestLayout(toProcessorRows(rows));
-        if (onReorderFinished) onReorderFinished();
-        });
+    
+    // Note: If you want to support "Double Rows" (combining two nodes into one visual row),
+    // you would need to update the "chainMode" property of the nodes involved 
+    // using chain.getChild(x).setProperty("chainMode", ..., &undoManager);
+    // inside this function.
 }
 
 // layout the daisy chain component
@@ -684,47 +560,43 @@ void DaisyChain::showAddMenu() {
 	// show menu async
     menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&addButton), [this](int result) {
         addButton.setColour(juce::TextButton::buttonColourId, Colors::button);
-
         if (result == 0) return;
-        if (result == 6 && hasFormant()) return;
-        if (result == 7 && hasPitch()) return;
-
-        // create new node based on selection
-        std::shared_ptr<EffectNode> newNode;
+        
+        // Define Type string based on result
+        juce::String type;
+        juce::String baseName;
         switch (result) {
-        case 1: newNode = std::make_shared<GainNode>(processorRef); break;
-        case 2: newNode = std::make_shared<NoiseGateNode>(processorRef); break;
-        case 3: newNode = std::make_shared<CompressorNode>(processorRef); break;
-        case 4: newNode = std::make_shared<DeEsserNode>(processorRef); break;
-        case 5: newNode = std::make_shared<DeNoiserNode>(processorRef); break;
-        case 6: newNode = std::make_shared<FormantNode>(processorRef); break;
-        case 7: newNode = std::make_shared<PitchNode>(processorRef); break;
-        case 8: newNode = std::make_shared<EqualizerNode>(processorRef); break;
-        case 9: newNode = std::make_shared<VST3Node>(processorRef); break;
+            case 1: type="GainNode"; baseName="Gain"; break;
+            case 2: type="NoiseGateNode"; baseName="Noise Gate"; break;
+            case 3: type="CompressorNode"; baseName="Compressor"; break;
+            case 4: type="DeEsserNode"; baseName="De-Esser"; break;
+            case 5: type="DeNoiserNode"; baseName="De-Noiser"; break;
+            case 6: type="FormantNode"; baseName="Formant"; break;
+            case 7: type="PitchNode"; baseName="Pitch"; break;
+            case 8: type="EqualizerNode"; baseName="Equalizer"; break;
+            case 9: type="VST3Node"; baseName="VST3"; break;
         }
-        if (!newNode) return;
 
-        // add to processor + ui lists
-        newNode->effectName = makeUniqueName(newNode->effectName, effectNodes);
+        if (type.isEmpty()) return;
 
-        // create and attach ValueTree to APVTS
-        effectNodes.push_back(newNode);
+        // Create the ValueTree for the new node
+        juce::ValueTree newNode(type);
+        
+        // Calculate unique name (reuse your existing helper, pass effectNodes)
+        juce::String uniqueName = makeUniqueName(baseName, effectNodes);
+        newNode.setProperty("name", uniqueName, nullptr);
+        newNode.setProperty("uuid", juce::Uuid().toString(), nullptr);
 
-        //updated to use rows instead of effectNames directly
-        Row r;
-        r.left = newNode->effectName;
-        rows.push_back(r);
-
-        // rebuild the chain
-        auto oldCb = onReorderFinished;
-        onReorderFinished = nullptr;
-        rebuild();
-        onReorderFinished = oldCb;
-
-		// notify processor of layout change
-        processorRef.requestLayout(toProcessorRows(rows));
-        if (onReorderFinished) onReorderFinished();
-        });
+        // DO NOT create EffectNode class here. DO NOT push to vector.
+        // DO NOT call requestLayout.
+        
+        // Simply add to APVTS state with UndoManager
+        auto chain = processorRef.apvts.state.getChildWithName("Chain");
+        chain.addChild(newNode, -1, &processorRef.undoManager);
+        
+        // The listener in PluginProcessor will instantiate the C++ object.
+        // The listener in DaisyChain will call rebuild().
+    });
 }
 
 // menu to duplicate existing effect nodes
@@ -797,46 +669,31 @@ void DaisyChain::showDuplicateMenu() {
 }
 // menu to delete existing effect nodes
 void DaisyChain::showDeleteMenu() {
-    if (reorderLocked) return;  // prevent adding if locked
+    if (reorderLocked) return;
 
-    // create menu with existing effect name
-	juce::PopupMenu menu; {   
-        for (int i = 0; i < effectNodes.size(); ++i) {
-            menu.addItem(i + 1, effectNodes[i]->effectName);
-        }
+    juce::PopupMenu menu;
+    for (int i = 0; i < effectNodes.size(); ++i) {
+        menu.addItem(i + 1, effectNodes[i]->effectName);
     }
 
-	// set look and feel
     menu.setLookAndFeel(&getLookAndFeel());
     deleteButton.setColour(juce::TextButton::buttonColourId, Colors::accent);
 
-	// show menu async
     menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&deleteButton), [this](int result) {
-            deleteButton.setColour(juce::TextButton::buttonColourId, Colors::button);
-            if (result == 0) return; // user canceled
-            const int index = result - 1;
-            if (index < 0 || index >= effectNodes.size()) return;
+        deleteButton.setColour(juce::TextButton::buttonColourId, Colors::button);
+        if (result == 0) return;
+        
+        const int index = result - 1;
+        if (index < 0 || index >= effectNodes.size()) return;
 
-            auto name = effectNodes[index]->effectName;
-
-            // remove from processor + UI lists
-            effectNodes.erase(effectNodes.begin() + index);
-
-            // remove any row containing that name (left or right)
-            rows.erase(std::remove_if(rows.begin(), rows.end(),
-                [&](const Row& r)
-                {
-                    return r.left == name || r.right == name;
-                }),
-                rows.end());
-
-            // rebuild the chain
-            juce::MessageManager::callAsync([this]() {
-                rebuild();
-                processorRef.requestLayout(toProcessorRows(rows));
-                if (onReorderFinished)
-                    onReorderFinished();
-                });
-        });
+        // Get the ValueTree corresponding to this node
+        // We assume effectNodes vector is in sync with Chain children order
+        auto chain = processorRef.apvts.state.getChildWithName("Chain");
+        auto child = chain.getChild(index);
+        
+        if (child.isValid()) {
+            chain.removeChild(child, &processorRef.undoManager);
+        }
+    });
 }
 

@@ -70,6 +70,8 @@ public:
     explicit VST3Node(AudioPluginAudioProcessor& proc);
     ~VST3Node() override;
 
+    VST3Node(AudioPluginAudioProcessor& proc, const juce::ValueTree& state);
+
     //Processing functions
     void process(AudioPluginAudioProcessor& proc, juce::AudioBuffer<float>& buffer) override;
     void prepareToPlay(double sampleRate, int samplesPerBlock);
