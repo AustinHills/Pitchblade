@@ -129,11 +129,10 @@ public:
 
         if (!processor.apvts.state.hasType("EffectNodes"))
             processor.apvts.state = juce::ValueTree("EffectNodes");
-
-        processor.apvts.state.addChild(getMutableNodeState(), -1, nullptr);
-        pitchDSP.prepare(proc.getSampleRate(), proc.getBlockSize());
-
     }
+
+    PitchNode(AudioPluginAudioProcessor& proc, const juce::ValueTree& existingState)
+        : EffectNode(proc, existingState), processor(proc) {}
 
     // forward audio buffer into processor's pitch detector
     void process(AudioPluginAudioProcessor& proc, juce::AudioBuffer<float>& buffer) override

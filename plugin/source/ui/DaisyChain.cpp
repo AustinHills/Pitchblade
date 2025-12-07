@@ -581,15 +581,16 @@ void DaisyChain::showDuplicateMenu() {
     if (reorderLocked) return;  // prevent adding if locked
 
     // check existing formant/pitch
-	const bool formantExists = hasFormant();    
+    const bool formantExists = hasFormant();    
     const bool pitchExists = hasPitch();
 
     // create menu with existing effect names
-	juce::PopupMenu menu;
+    juce::PopupMenu menu;
     for (int i = 0; i < effectNodes.size(); ++i) {
+        if (!effectNodes[i]) continue;
         const auto& name = effectNodes[i]->effectName;
 
-		// disable if formant/pitch already exists
+        // disable if formant/pitch already exists
         bool disable = false;
         if (name.startsWith("Formant") && formantExists) disable = true;
         if (name.startsWith("Pitch") && pitchExists) disable = true;
@@ -597,53 +598,42 @@ void DaisyChain::showDuplicateMenu() {
         menu.addItem(i + 1, name, !disable);
     }
     
-	// set look and feel
+    // set look and feel
     menu.setLookAndFeel(&getLookAndFeel());
     duplicateButton.setColour(juce::TextButton::buttonColourId, Colors::accent);
 
-	// show menu async
+    // show menu async
     menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&duplicateButton), [this](int result) {
-            duplicateButton.setColour(juce::TextButton::buttonColourId, Colors::button);
+        duplicateButton.setColour(juce::TextButton::buttonColourId, Colors::button);
 
-            if (result == 0) return;
-            const int index = result - 1;
-            if (index < 0 || index >= effectNodes.size()) return;
+        if (result == 0) return;
+        const int index = result - 1;
+        if (index < 0 || index >= effectNodes.size()) return;
 
-			// check formant/pitch constraints
-            juce::String name = effectNodes[index]->effectName;
-            if (name.startsWith("Formant") && hasFormant()) return;
-            if (name.startsWith("Pitch") && hasPitch()) return;
+        auto original = effectNodes[index];
+        if (!original) return;
 
-            auto original = effectNodes[index];
-            if (!original) return;
+        // 1. Create a deep copy of the existing state
+        juce::ValueTree originalState = original->getNodeStateConst();
+        juce::ValueTree newState = originalState.createCopy();
 
-            // clone node object
-            auto clone = original->clone();
-            if (!clone) return;
+        // 2. Assign new UUID so it is treated as a unique object
+        newState.setProperty("uuid", juce::Uuid().toString(), nullptr);
 
-            // clone its valueTree (parameters) and attach to apvts
-            juce::ValueTree clonedTree(original->getNodeTypeConst() + "_" + juce::Uuid().toString());
-            clonedTree.copyPropertiesAndChildrenFrom(original->getNodeStateConst(), nullptr);
+        // 3. Generate new unique Name
+        // We use the helper to ensure we don't get duplicate names like "Gain 2 2"
+        juce::String currentName = originalState.getProperty("name").toString();
+        juce::String newName = makeUniqueName(currentName, effectNodes);
+        newState.setProperty("name", newName, nullptr);
 
-			processorRef.apvts.state.addChild(clonedTree, -1, nullptr);     // add to apvts
-			clone->getNodeStateRef() = clonedTree;          // set cloned tree to new node
-
-			clone->effectName = makeUniqueName(original->effectName, effectNodes);  // make unique name
-			effectNodes.push_back(clone);                   // add to processor list
-            // add a new single row for it
-            Row r;
-            r.left = clone->effectName;
-            rows.push_back(r);
-
-			auto oldCb = onReorderFinished;     // rebuild chain
-            onReorderFinished = nullptr;    
-            rebuild();
-            onReorderFinished = oldCb;          
-            processorRef.requestLayout(toProcessorRows(rows));
-
-            if (onReorderFinished) onReorderFinished();
-        });
+        // 4. Add to APVTS state with UndoManager
+        // This single line triggers the ValueTree listener in PluginProcessor, 
+        // which creates the Node, updates the vector, and triggers the UI rebuild.
+        auto chain = processorRef.apvts.state.getChildWithName("Chain");
+        chain.addChild(newState, -1, &processorRef.undoManager);
+    });
 }
+
 // menu to delete existing effect nodes
 void DaisyChain::showDeleteMenu() {
     if (reorderLocked) return;

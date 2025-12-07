@@ -84,6 +84,9 @@ public:
             state.setProperty("FORMANT_MIX", 1.0f, nullptr);     // slider range  0 to 1
     }
 
+    FormantNode(AudioPluginAudioProcessor& proc, const juce::ValueTree& existingState)
+        : EffectNode(proc, existingState), processor(proc) {}
+
     void process (AudioPluginAudioProcessor& proc, juce::AudioBuffer<float>& buffer) override {
         // Apply formant shift, blend dry/wet, then update visualizer formant state
         //Grab params from this node's local state

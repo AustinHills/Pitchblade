@@ -91,12 +91,10 @@ public:
         //Ensure EffectNodes tree exists
         if(!processor.apvts.state.hasType("EffectNodes"))
             processor.apvts.state = juce::ValueTree("EffectNodes");
-
-        //Add this node to processor state tree
-        processor.apvts.state.addChild(getMutableNodeState(),-1,nullptr);
-
-        deNoiserDSP.prepare(proc.getSampleRate());
     }
+
+    DeNoiserNode(AudioPluginAudioProcessor& proc, const juce::ValueTree& existingState)
+        : EffectNode(proc, existingState), processor(proc) {}
 
     //DSP processing step for denoiser
     void process(AudioPluginAudioProcessor& proc, juce::AudioBuffer<float>& buffer) override {

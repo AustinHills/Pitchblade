@@ -85,13 +85,10 @@ public:
         // make sure the global tree exists
         if (!processor.apvts.state.hasType("EffectNodes"))
             processor.apvts.state = juce::ValueTree("EffectNodes");
-
-        // attach this new tree to EffectNodes as a new child
-        processor.apvts.state.addChild(st, -1, nullptr);
-
-        // assign this new unique state to this node
-        nodeState = st;
     }
+
+    EqualizerNode(AudioPluginAudioProcessor& proc, const juce::ValueTree& existingState)
+        : EffectNode(proc, existingState), processor(proc) {}
 
     // use node state for the panel
     std::unique_ptr<juce::Component> createPanel(AudioPluginAudioProcessor& proc) override {
