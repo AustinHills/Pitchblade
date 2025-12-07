@@ -63,15 +63,6 @@ static juce::String makeUniqueName(const juce::String& baseName, const std::vect
     return cleanBase + " " + juce::String(counter);
 }
 
-//convert UI rows into processor rows
-static std::vector<AudioPluginAudioProcessor::Row> toProcessorRows(const std::vector<DaisyChain::Row>& uiRows) {
-    std::vector<AudioPluginAudioProcessor::Row> out;
-    out.reserve(uiRows.size());
-    for (auto& r : uiRows)
-        out.push_back({ r.left, r.right });
-    return out;
-}
-
 // DaisyChain constructor
 DaisyChain::DaisyChain(AudioPluginAudioProcessor& proc, std::vector<std::shared_ptr<EffectNode>>& nodes) :processorRef(proc), effectNodes(nodes) {
 	// add + duplicate buttons
@@ -106,17 +97,17 @@ DaisyChain::DaisyChain(AudioPluginAudioProcessor& proc, std::vector<std::shared_
 // check if any row has a formant / pitch effect
 // only allowing one of each type in the chain. has audio bugs if multiple formant or pitch effects are present
 bool DaisyChain::hasFormant() const {
-    for (auto& r : rows) {
-        if (r.left.startsWith("Formant")) return true;
-        if (r.right.startsWith("Formant")) return true;
+    std::lock_guard<std::recursive_mutex> lg(processorRef.getMutex());
+    for (auto& n : effectNodes) {
+        if (n && n->effectName.startsWith("Formant")) return true;
     }
     return false;
 }
 
 bool DaisyChain::hasPitch() const {
-    for (auto& r : rows) {
-        if (r.left.startsWith("Pitch")) return true;
-        if (r.right.startsWith("Pitch")) return true;
+    std::lock_guard<std::recursive_mutex> lg(processorRef.getMutex());
+    for (auto& n : effectNodes) {
+        if (n && n->effectName.startsWith("Pitch")) return true;
     }
     return false;
 }
@@ -144,18 +135,6 @@ static std::tuple<int, bool, bool> findRowAndSide(const std::vector<DaisyChain::
         if (rows[i].right == name) return { i, true , true };
     }
     return { -1, false, false };
-}
-
-//reset rows to match effectNodes vector
-//rebuilds the rows from effectNodes as straight one per row
-void DaisyChain::resetRowsToNodes() {
-    std::lock_guard<std::recursive_mutex> lg(processorRef.getMutex());
-    rows.clear();
-    for (auto& n : effectNodes) {
-        if (!n) continue;
-        Row r; r.left = n->effectName;
-        rows.push_back(std::move(r));
-    }
 }
 
 // rebuilds the UI from current rows and effectNodes
@@ -223,20 +202,22 @@ void DaisyChain::handleReorder(int kind, const juce::String& dragName, int targe
     
     if (oldIndex == -1) return;
 
-    // Logic to determine new index based on targetRow
-    // This depends on how your `targetRow` maps to the linear list
-    // For simplicity, we assume 1 item = 1 row in the flattened list
+    // Map targetRow (UI row index) to linear index in ValueTree
+    // Since rebuild() maps ValueTree children linearly to rows (mostly), 
+    // we can approximate the target index.
     int newIndex = juce::jlimit(0, chain.getNumChildren() - 1, targetRow);
     
-    // Perform the move via UndoManager
+    // Check if target is actually a "Double Row" slot (kind == -2)
+    // For now, standard reorder:
     if (oldIndex != newIndex) {
         chain.moveChild(oldIndex, newIndex, &processorRef.undoManager);
     }
     
-    // Note: If you want to support "Double Rows" (combining two nodes into one visual row),
-    // you would need to update the "chainMode" property of the nodes involved 
-    // using chain.getChild(x).setProperty("chainMode", ..., &undoManager);
-    // inside this function.
+    // If double row logic is needed here (combining nodes):
+    if (kind == -2) {
+        // Logic to set "chainMode" property to DoubleDown on the target node
+        // would go here, interacting with processorRef.undoManager
+    }
 }
 
 // layout the daisy chain component
@@ -325,88 +306,84 @@ void DaisyChain::paint(juce::Graphics& g) {
         g.fillAll();
     }
 
-    // small path icons for chain arrows
+    // Arrow Helpers (Keep these as they were)
     auto drawDownArrow = [&](juce::Graphics& gr, juce::Point<float> c) {
-            juce::Path p;
-            p.startNewSubPath(c.x - 5, c.y - 5);
-            p.lineTo(c.x, c.y + 5);
-            p.lineTo(c.x + 5, c.y - 5);
-            p.closeSubPath();
-            gr.setColour(Colors::accentTeal); // teal
-            gr.fillPath(p);
-        };
+        juce::Path p;
+        p.startNewSubPath(c.x - 5, c.y - 5);
+        p.lineTo(c.x, c.y + 5);
+        p.lineTo(c.x + 5, c.y - 5);
+        p.closeSubPath();
+        gr.setColour(Colors::accentTeal);
+        gr.fillPath(p);
+    };
 
-    auto drawSplitArrow = [&](juce::Graphics& gr, juce::Point<float> c)  {
-            juce::Path p;
-            p.startNewSubPath(c.x, c.y - 5);
-            p.lineTo(c.x - 5, c.y + 5);
-            p.startNewSubPath(c.x, c.y - 5);
-            p.lineTo(c.x + 5, c.y + 5);
-            gr.setColour(Colors::accentPink); // pink
-            gr.strokePath(p, juce::PathStrokeType(2.0f));
-        };
+    auto drawSplitArrow = [&](juce::Graphics& gr, juce::Point<float> c) {
+        juce::Path p;
+        p.startNewSubPath(c.x, c.y - 5);
+        p.lineTo(c.x - 5, c.y + 5);
+        p.startNewSubPath(c.x, c.y - 5);
+        p.lineTo(c.x + 5, c.y + 5);
+        gr.setColour(Colors::accentPink);
+        gr.strokePath(p, juce::PathStrokeType(2.0f));
+    };
 
     auto drawDoubleDownArrows = [&](juce::Graphics& gr, juce::Point<float> c) {
-            juce::Path p;
-            float height = 10.0f;
-            float spacing = 10.0f;
-            float lineWidth = 2.0f;
-
-            p.startNewSubPath(c.x - spacing / 2, c.y - height / 2);
-            p.lineTo(c.x - spacing / 2, c.y + height / 2);
-            p.startNewSubPath(c.x + spacing / 2, c.y - height / 2);
-            p.lineTo(c.x + spacing / 2, c.y + height / 2);
-
-            gr.setColour(Colors::accentPurple); // purple
-            gr.strokePath(p, juce::PathStrokeType(lineWidth));
-        };
+        juce::Path p;
+        float height = 10.0f;
+        float spacing = 10.0f;
+        float lineWidth = 2.0f;
+        p.startNewSubPath(c.x - spacing / 2, c.y - height / 2);
+        p.lineTo(c.x - spacing / 2, c.y + height / 2);
+        p.startNewSubPath(c.x + spacing / 2, c.y - height / 2);
+        p.lineTo(c.x + spacing / 2, c.y + height / 2);
+        gr.setColour(Colors::accentPurple);
+        gr.strokePath(p, juce::PathStrokeType(lineWidth));
+    };
 
     auto drawUniteArrow = [&](juce::Graphics& gr, juce::Point<float> c) {
-            juce::Path p;
-            c.y -= 2.0f;
-            p.startNewSubPath(c.x - 5, c.y - 5);
-            p.lineTo(c.x, c.y + 5);
-            p.lineTo(c.x + 5, c.y - 5);
-            gr.setColour(Colors::accentBlue); // blue unite
-            gr.strokePath(p, juce::PathStrokeType(2.0f));
-        };
+        juce::Path p;
+        c.y -= 2.0f;
+        p.startNewSubPath(c.x - 5, c.y - 5);
+        p.lineTo(c.x, c.y + 5);
+        p.lineTo(c.x + 5, c.y - 5);
+        gr.setColour(Colors::accentBlue);
+        gr.strokePath(p, juce::PathStrokeType(2.0f));
+    };
 
-	//drawing arrows between rows 
-    const int rowCount = (int)rows.size();
-    for (int i = 0; i + 1 < rowCount; ++i) {
-		// guarded pointers incase of invalid rows
-		DaisyChainItem* cur = (i < items.size() ? items[i] : nullptr);          // current
-		DaisyChainItem* next = (i + 1 < items.size() ? items[i + 1] : nullptr); // next
+    // Drawing arrows between items (using UI items instead of rows vector)
+    const int count = items.size();
+    for (int i = 0; i + 1 < count; ++i) {
+        DaisyChainItem* cur = items[i];
+        DaisyChainItem* next = items[i + 1];
         if (!cur || !next) continue;
 
-        // midpoint between bottom of current and top of next 
-        juce::Point<int> curBottom = getLocalPoint( cur, juce::Point<int>(cur->getWidth() / 2, cur->getHeight()));
-        juce::Point<int> nextTop = getLocalPoint( next, juce::Point<int>(next->getWidth() / 2, 0));
+        // midpoint 
+        juce::Point<int> curBottom = getLocalPoint(cur, juce::Point<int>(cur->getWidth() / 2, cur->getHeight()));
+        juce::Point<int> nextTop = getLocalPoint(next, juce::Point<int>(next->getWidth() / 2, 0));
 
         float xMid = 0.5f * (curBottom.x + nextTop.x);
         float yMid = 0.5f * (curBottom.y + nextTop.y);
-
         xMid += 2.0f; 
         juce::Point<float> mid(xMid, yMid);
 
-        bool thisIsDouble = (i < rowCount && rows[i].hasRight());
-        bool nextIsDouble = (i + 1 < rowCount && rows[i + 1].hasRight());
+        bool thisIsDouble = cur->isDoubleRow;
+        bool nextIsDouble = next->isDoubleRow;
 
-        // drawing 
-        if (thisIsDouble && nextIsDouble)       {drawDoubleDownArrows(g, mid); } 
-        else if (thisIsDouble && !nextIsDouble) { drawUniteArrow(g, mid); } 
-        else if (!thisIsDouble && nextIsDouble) { drawSplitArrow(g, mid); } 
-        else                                    { drawDownArrow(g, mid);
-        }
+        if (thisIsDouble && nextIsDouble)       drawDoubleDownArrows(g, mid);
+        else if (thisIsDouble && !nextIsDouble) drawUniteArrow(g, mid);
+        else if (!thisIsDouble && nextIsDouble) drawSplitArrow(g, mid);
+        else                                    drawDownArrow(g, mid);
     }
 }
 
 // flatten current rows into single list of effect names
 std::vector<juce::String> DaisyChain::getCurrentOrder() const {
-	std::vector<juce::String> flat; // flattened list
-    for (auto& r : rows) {
-        flat.push_back(r.left);
-        if (r.hasRight()) flat.push_back(r.right);
+    std::vector<juce::String> flat;
+    for (auto* item : items) {
+        if (!item) continue;
+        flat.push_back(item->getName());
+        if (!item->rightEffectName.isEmpty())
+            flat.push_back(item->rightEffectName);
     }
     return flat;
 }

@@ -20,18 +20,6 @@
 #include "Pitchblade/panels/PresetsPanel.h"
 
 //==============================================================================
-// helper to convert DaisyChain Row to processing row procRow - reyna
-struct ProcRow { juce::String left, right; };
-static std::vector<ProcRow> toProcRows(const std::vector<DaisyChain::Row>& uiRows) {
-    std::vector<ProcRow> out;
-    out.reserve(uiRows.size());
-    for (auto& r : uiRows) {
-        out.push_back({ r.left, r.right });
-    }
-    return out;
-}
-
-//==============================================================================
 AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAudioProcessor& p): AudioProcessorEditor(&p),processorRef(p), 
                                                                     daisyChain(p, p.getEffectNodes()),
                                                                     effectPanel(p, p.getEffectNodes()), 
@@ -220,7 +208,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
                 editor->closeOverlaysIfOpen();
         }
 
-        // 2. Refresh Visualizer references (since nodes might have moved/changed)
+        // 2. Refresh Visualizer references
         visualizer.clearVisualizer();
 
         // 3. Reconnect Buttons (UI Logic only)
@@ -248,7 +236,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
                 // RIGHT btn
                 if (!row->rightEffectName.isEmpty()) {
                     row->rightButton.onClick = [this, name = row->rightEffectName]() {
-                        closeOverlaysIfOpen(); // Added close overlays here too
+                        closeOverlaysIfOpen();
                         std::lock_guard<std::recursive_mutex> lg(processorRef.getMutex());
                         auto& nodes = processorRef.getEffectNodes();
                         for (int n = 0; n < (int)nodes.size(); ++n) {
@@ -299,24 +287,20 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
 }
 
 void AudioPluginAudioProcessorEditor::rebuildAndSyncUI() {
-    // REMOVED: procRows fetching and daisyChain.setRows(uiRows)
-    // The DaisyChain now listens to the ValueTree directly. 
+    // REMOVED: setRows and requestLayout logic. 
+    // The DaisyChain now rebuilds itself by listening to the APVTS.
     
     std::lock_guard<std::recursive_mutex> lg(processorRef.getMutex());
-    // juce::Logger::outputDebugString("Rebuilding DaisyChain + Panels");
 
-    // daisyChain.resetRowsToNodes(); // REMOVED
-    
-    daisyChain.rebuild();             // This now reads directly from Processor's effectNodes (which are synced to APVTS)
+    daisyChain.rebuild();             
     effectPanel.refreshTabs();        
     visualizer.refreshTabs();         
     resized();                        
     repaint();
 
-    // Reconnect buttons (Same logic as in onReorderFinished)
+    // Reconnect buttons
     for (int i = 0; i < daisyChain.items.size(); ++i) {
         if (auto* row = daisyChain.items[i]) {
-
             const juce::String effectName = row->getName(); 
             row->button.onClick = [this, effectName]() {
                 std::lock_guard<std::recursive_mutex> lg(processorRef.getMutex());
@@ -352,7 +336,7 @@ void AudioPluginAudioProcessorEditor::rebuildAndSyncUI() {
     }
     applyRowTooltips();
     
-    // Keep active selection logic (Unchanged)
+    // Keep active selection logic
     if (activeEffectName.isNotEmpty()) {
         auto& nodes = processorRef.getEffectNodes();
         bool nameFound = false;

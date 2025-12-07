@@ -147,21 +147,18 @@ VST3Panel::VST3Panel(AudioPluginAudioProcessor& proc, VST3Node& node)
 VST3Panel::~VST3Panel() { stopTimer(); }
 
 VST3Node::VST3Node(AudioPluginAudioProcessor& proc, const juce::ValueTree& state)
-    : EffectNode(proc, state) // Pass state to base class
+    : EffectNode(proc, state)
 {
     scannerThread = std::make_unique<ScannerThread>(*this);
     fifo.resize(fftSize);
     fftData.resize(fftSize * 2);
     
-    // Initialize standard things
+    // Standard init
     if (!formatManager) {
         formatManager = std::make_unique<juce::AudioPluginFormatManager>();
         formatManager->addDefaultFormats();
         syncFromGlobalCache();
     }
-    
-    // We don't load the plugin here immediately; loadFromXml (called by base) or 
-    // the layout sync will handle it.
 }
 
 void VST3Panel::updatePluginListUI()
@@ -427,21 +424,18 @@ void VST3Node::loadPluginById(const juce::String& pluginId) {
 
 void VST3Node::finishLoad(std::unique_ptr<juce::AudioPluginInstance> instance, const juce::String& errorMsg, const juce::String& preferredName) {
     if (instance) {
-
         if (activeWindow) {
             activeWindow->setVisible(false);
             delete activeWindow.getComponent();
         }
 
         const juce::String oldName = effectName;
-        // Start with the plugin's reported name
         juce::String baseRawName = preferredName.isNotEmpty() ? preferredName : instance->getName();
         
-        // Thread safe rename logic
         {
             std::lock_guard<std::recursive_mutex> lock(processor.getMutex());
             
-            // 1. Clean the base name (remove trailing numbers to avoid "Synth 1 2")
+            // 1. Clean Name
             juce::String cleanBase = baseRawName.trim();
             int lastSpace = cleanBase.lastIndexOfChar(' ');
             if (lastSpace > 0) {
@@ -454,39 +448,31 @@ void VST3Node::finishLoad(std::unique_ptr<juce::AudioPluginInstance> instance, c
                     cleanBase = cleanBase.substring(0, lastSpace);
             }
 
-            // 2. Find a unique name
+            // 2. Unique Name
             juce::String uniqueName = cleanBase;
             int counter = 2;
-
             auto nameExists = [&](const juce::String& name) {
                 const auto& nodes = processor.getEffectNodes();
                 for (auto& n : nodes) {
-                    // Check for name match, but IGNORE 'this' node 
-                    // (we don't want to conflict with ourselves)
                     if (n && n->effectName == name && n.get() != this)
                         return true;
                 }
                 return false;
             };
 
-            // If base name is taken, append numbers until unique
             if (nameExists(uniqueName)) {
                  while (nameExists(cleanBase + " " + juce::String(counter)))
                      counter++;
                  uniqueName = cleanBase + " " + juce::String(counter);
             }
 
-            // --- End Unique Name Generation ---
-
-            // 3. Update the Layout Rows with the new unique name
+            // 3. Update ValueTree (This triggers listeners to update UI/Layout)
             getMutableNodeState().setProperty("name", uniqueName, &processor.undoManager);
 
+            // 4. Setup Plugin
             auto layout = processor.getBusesLayout();
             if (instance->checkBusesLayoutSupported(layout)) {
                 instance->setBusesLayout(layout);
-            } else {
-                // If strictly mono, this will fail silently, which is fine
-                // because we handle it in process() below.
             }
 
             double sr = processor.getSampleRate();
