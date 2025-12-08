@@ -186,6 +186,8 @@ public:
         //ensure EffectNodes tree exists
         if (!processor.apvts.state.hasType("EffectNodes"))
             processor.apvts.state = juce::ValueTree("EffectNodes");
+
+        compressorDSP.prepare(proc.getSampleRate());
     }
 
     CompressorNode(AudioPluginAudioProcessor& proc, const juce::ValueTree& existingState)

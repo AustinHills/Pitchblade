@@ -94,6 +94,8 @@ public:
         //Ensure EffectNodes tree exists
         if (!processor.apvts.state.hasType("EffectNodes"))
             processor.apvts.state = juce::ValueTree("EffectNodes");
+
+        deEsserDSP.prepare(proc.getSampleRate(),proc.getCurrentBlockSize());
     }
 
     DeEsserNode(AudioPluginAudioProcessor& proc, const juce::ValueTree& existingState)

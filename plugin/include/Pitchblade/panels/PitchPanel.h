@@ -129,6 +129,8 @@ public:
 
         if (!processor.apvts.state.hasType("EffectNodes"))
             processor.apvts.state = juce::ValueTree("EffectNodes");
+
+        pitchDSP.prepare(proc.getSampleRate(), proc.getBlockSize());
     }
 
     PitchNode(AudioPluginAudioProcessor& proc, const juce::ValueTree& existingState)

@@ -100,6 +100,8 @@ public:
         // ensure EffectNodes tree exists
         if (!processor.apvts.state.hasType("EffectNodes"))
             processor.apvts.state = juce::ValueTree("EffectNodes");
+
+        gateDSP.prepare(proc.getSampleRate());
     }
 
     NoiseGateNode(AudioPluginAudioProcessor& proc, const juce::ValueTree& existingState)
