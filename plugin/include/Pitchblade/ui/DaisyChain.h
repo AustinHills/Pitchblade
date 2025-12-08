@@ -23,6 +23,8 @@ class DaisyChain : public juce::Component, public juce::ValueTree::Listener {
 public:
     DaisyChain(AudioPluginAudioProcessor& proc, std::vector<std::shared_ptr<EffectNode>>& nodes);
 
+    ~DaisyChain();
+
     void resized() override;
     void paint(juce::Graphics&) override;
 	void setGlobalBypassVisual(bool globalBypassed);    // grayed out when global bypassed
@@ -81,13 +83,11 @@ public:
     }
 
     // Listen to the APVTS to update UI
-    void valueTreeChildAdded(juce::ValueTree&, juce::ValueTree&) override { rebuild(); }
-    void valueTreeChildRemoved(juce::ValueTree&, juce::ValueTree&, int) override { rebuild(); }
-    void valueTreeChildOrderChanged(juce::ValueTree&, int, int) override { rebuild(); }
+    void valueTreeChildAdded(juce::ValueTree&, juce::ValueTree&) override;
+    void valueTreeChildRemoved(juce::ValueTree&, juce::ValueTree&, int) override;
+    void valueTreeChildOrderChanged(juce::ValueTree&, int, int) override;
 
-    void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier& property) override {
-        if (property.toString() == "name") rebuild();
-    }
+    void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier& property) override;
 
 //private:
 	// reorder handler for multi row support

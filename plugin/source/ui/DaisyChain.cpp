@@ -85,13 +85,31 @@ DaisyChain::DaisyChain(AudioPluginAudioProcessor& proc, std::vector<std::shared_
 
     // Attach to the Chain value tree
     auto chain = processorRef.apvts.state.getChildWithName("Chain");
-    if (chain.isValid())
+    if (chain.isValid()){
         chain.addListener(this);
+
+        for (auto child : chain) {
+            child.addListener(this);
+        }
+    }
     else 
         processorRef.apvts.state.addListener(this); // Fallback
         
     // Initial build
     rebuild();
+}
+
+DaisyChain::~DaisyChain() {
+    auto chain = processorRef.apvts.state.getChildWithName("Chain");
+    if (chain.isValid()) {
+        chain.removeListener(this);
+        
+        // Remove listener from every child node
+        for (auto child : chain)
+            child.removeListener(this);
+    } else {
+        processorRef.apvts.state.removeListener(this);
+    }
 }
 
 // check if any row has a formant / pitch effect
@@ -680,3 +698,26 @@ void DaisyChain::showDeleteMenu() {
     });
 }
 
+void DaisyChain::valueTreeChildAdded(juce::ValueTree& parentTree, juce::ValueTree& child) {
+    // Start listening to the new child node immediately
+    child.addListener(this);
+    rebuild();
+}
+
+void DaisyChain::valueTreeChildRemoved(juce::ValueTree& parentTree, juce::ValueTree& child, int) {
+    // Stop listening to the removed child node
+    child.removeListener(this);
+    rebuild();
+}
+
+void DaisyChain::valueTreeChildOrderChanged(juce::ValueTree&, int, int) {
+    rebuild();
+}
+
+void DaisyChain::valueTreePropertyChanged(juce::ValueTree& tree, const juce::Identifier& property) {
+    // When the VST3 finishes loading, it updates its "name" property.
+    // We catch that here and trigger a UI rebuild.
+    if (property.toString() == "name") {
+        juce::MessageManager::callAsync([this]() { rebuild(); });
+    }
+}
