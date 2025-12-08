@@ -274,6 +274,10 @@ void AudioPluginAudioProcessor::loadPresetFromFile(const juce::File& file) {
             // Ensure Chain child exists
             if (!apvts.state.getChildWithName("Chain").isValid())
                 apvts.state.addChild(juce::ValueTree("Chain"), -1, nullptr);
+
+            apvts.state.addListener(this);
+
+            syncChainFromState();
         }
 
         triggerUIRebuild();

@@ -4,6 +4,7 @@
 
 //Static global plugin list
 juce::KnownPluginList VST3Node::globalPluginList;
+std::recursive_mutex VST3Node::pluginListMutex;
 
 //Local Window Class
 //This handles the VST3 editor window and ensures it deletes itself properly
@@ -56,6 +57,9 @@ void VST3Node::ScannerThread::run()
         searchPath.add("/usr/lib/vst3");
     #endif
 
+    // [FIX] Lock during the entire background scan to prevent races with foreground actions
+    std::lock_guard<std::recursive_mutex> lock(VST3Node::pluginListMutex);
+
     //Scanner
     juce::PluginDirectoryScanner scanner(owner.globalPluginList, 
                                          *vst3Format, 
@@ -74,6 +78,9 @@ void VST3Node::ScannerThread::run()
     if (!threadShouldExit()) {
         progress.store(1.0f);
     }
+    
+    // [FIX] Notify owner that scan is complete
+    owner.handleScanFinished();
 }
 
 //VST3Panel Implementation
@@ -136,10 +143,26 @@ VST3Node::VST3Node(AudioPluginAudioProcessor& proc, const juce::ValueTree& state
         formatManager = std::make_unique<juce::AudioPluginFormatManager>();
         formatManager->addDefaultFormats();
     }
+
+    // [FIX] Schedule restore to run after the constructor finishes.
+    // We must cast the shared pointer to VST3Node because shared_from_this() 
+    // returns a pointer to the base EffectNode class.
+    juce::MessageManager::callAsync([this]() {
+        try {
+            if (auto self = std::dynamic_pointer_cast<VST3Node>(shared_from_this())) {
+                self->restoreFromState(); // Default param true
+            }
+        } catch (...) {
+            // Abort if node is already deleted
+        }
+    });
 }
 
 void VST3Panel::updatePluginListUI()
 {
+    // Lock when reading the list for UI update
+    std::lock_guard<std::recursive_mutex> lock(VST3Node::pluginListMutex);
+
     pluginList.clear();
     const auto list = vstNode.getPluginList().getTypes();
     for (int i = 0; i < list.size(); ++i) {
@@ -183,10 +206,20 @@ void VST3Panel::timerCallback() {
     } else {
         scanButton.setEnabled(true);
         
-        //Check if list needs refresh
+        // [FIX] Lock when checking list size
+        {
+            std::lock_guard<std::recursive_mutex> lock(VST3Node::pluginListMutex);
+            if (pluginList.getNumItems() != vstNode.getPluginList().getNumTypes()) {
+                // updatePluginListUI handles its own lock, so we unlock here or rely on recursive mutex
+                // updatePluginListUI(); // Call below outside this scope or inside recursive is fine
+            }
+        }
+        
+        // Re-check with recursive lock safety
+        std::lock_guard<std::recursive_mutex> lock(VST3Node::pluginListMutex);
         if (pluginList.getNumItems() != vstNode.getPluginList().getNumTypes()) {
-            updatePluginListUI();
-            if (pluginList.getNumItems() > 0)
+            updatePluginListUI(); // This locks again, fine for recursive
+             if (pluginList.getNumItems() > 0)
                 statusLabel.setText("Plugins Loaded from Cache", juce::dontSendNotification);
         } else if (vstNode.getLoadedPluginName().isNotEmpty()) {
              statusLabel.setText("Loaded: " + vstNode.getLoadedPluginName(), juce::dontSendNotification);
@@ -349,14 +382,19 @@ const juce::KnownPluginList& VST3Node::getPluginList() const {
 
 void VST3Node::loadPluginById(const juce::String& pluginId) {
     initializeHosting();
-    auto type = globalPluginList.getTypeForIdentifierString(pluginId);
+    
+    std::unique_ptr<juce::PluginDescription> type;
+    {
+        std::lock_guard<std::recursive_mutex> lock(pluginListMutex);
+        type = globalPluginList.getTypeForIdentifierString(pluginId);
+    }
+
     if (!type) return;
 
     //Async load to prevent freezing
-
-    //weak_ptr is used to prevent a crash if the node is deleted during its loading
     std::weak_ptr<VST3Node> weakSelf = std::dynamic_pointer_cast<VST3Node>(shared_from_this());
 
+    // Dereference type (*type) to pass the PluginDescription reference
     formatManager->createPluginInstanceAsync(*type, 44100.0, 512, 
         [weakSelf](std::unique_ptr<juce::AudioPluginInstance> instance, const juce::String& error) {
             if (auto self = weakSelf.lock()) {
@@ -404,6 +442,11 @@ void VST3Node::finishLoad(std::unique_ptr<juce::AudioPluginInstance> instance, c
                 return false;
             };
 
+            // If we are restoring from a save, we might want to keep the saved name 
+            // even if it duplicates (technically), but unique logic handles conflicts.
+            // If preferredName was passed (from restore), we might want to respect it strictly
+            // but the uniqueness check is safer.
+
             if (nameExists(uniqueName)) {
                  while (nameExists(cleanBase + " " + juce::String(counter)))
                      counter++;
@@ -431,10 +474,16 @@ void VST3Node::finishLoad(std::unique_ptr<juce::AudioPluginInstance> instance, c
 
             hostedPlugin->prepareToPlay(sr, bs);
 
+            // [FIX] Ensure the ValueTree has the plugin info for future saves
+            flushPluginStateToValueTree();
+
             processor.triggerUIRebuild();
         }
     } else {
-        juce::NativeMessageBox::showMessageBoxAsync(juce::AlertWindow::WarningIcon, "Load Failed", errorMsg);
+        // [Optional] If loading failed, maybe don't show a box if it was an automated restore
+        // but user might want to know.
+        if (preferredName.isEmpty()) // Only show if this was an explicit load attempt?
+            juce::NativeMessageBox::showMessageBoxAsync(juce::AlertWindow::WarningIcon, "Load Failed", errorMsg);
     }
 }
 
@@ -517,6 +566,9 @@ void VST3Node::loadFromXml(const juce::XmlElement& xml) {
     // Helper lambda to find the plugin description in the global list
     // Returns true if found and updates 'desc'
     auto findPluginInList = [&]() -> bool {
+        // [FIX] Lock
+        std::lock_guard<std::recursive_mutex> lock(pluginListMutex);
+        
         // 1. Try to find by unique Plugin ID (Most Reliable)
         if (pluginId.isNotEmpty()) {
             if (auto type = globalPluginList.getTypeForIdentifierString(pluginId)) {
@@ -588,10 +640,14 @@ void VST3Node::loadFromXml(const juce::XmlElement& xml) {
             #endif
 
             // Sync scan into global list
-            juce::PluginDirectoryScanner scanner(globalPluginList, *vst3Format, searchPath, true, juce::File());
-            juce::String scanName;
-            while (scanner.scanNextFile(true, scanName)) {
-                // block until finished
+            // [FIX] Lock
+            {
+                std::lock_guard<std::recursive_mutex> lock(pluginListMutex);
+                juce::PluginDirectoryScanner scanner(globalPluginList, *vst3Format, searchPath, true, juce::File());
+                juce::String scanName;
+                while (scanner.scanNextFile(true, scanName)) {
+                    // block until finished
+                }
             }
         }
 
@@ -610,7 +666,6 @@ void VST3Node::loadFromXml(const juce::XmlElement& xml) {
                     self->finishLoad(std::move(instance), error, name);
                     
                     // Apply state safely under lock
-                    // [FIX] Locked the mutex to prevent race conditions during state restoration
                     if (self->hostedPlugin && state.getSize() > 0) {
                         std::lock_guard<std::recursive_mutex> lock(self->processor.getMutex());
                         self->hostedPlugin->setStateInformation(state.getData(), (int)state.getSize());
@@ -619,4 +674,141 @@ void VST3Node::loadFromXml(const juce::XmlElement& xml) {
             }
         );
     }
+}
+
+void VST3Node::restoreFromState(bool allowScan) {
+    // 1. Get metadata from the ValueTree
+    auto& state = getMutableNodeState();
+    juce::String pluginId = state.getProperty("pluginId").toString();
+    juce::String savedName = state.getProperty("name").toString();
+    juce::String savedStateData = state.getProperty("pluginState").toString();
+
+    // If we have no ID and the name is just "VST3", likely a fresh node, do nothing
+    if (pluginId.isEmpty() && savedName == "VST3") return;
+
+    initializeHosting();
+
+    juce::PluginDescription desc;
+
+    // 2. Helper to find plugin in global list
+    auto findPluginInList = [&]() -> bool {
+        // [FIX] Lock list access
+        std::lock_guard<std::recursive_mutex> lock(pluginListMutex);
+
+        // A. Try exact ID match
+        if (pluginId.isNotEmpty()) {
+            if (auto type = globalPluginList.getTypeForIdentifierString(pluginId)) {
+                desc = *type;
+                return true;
+            }
+        }
+
+        // B. Try Fuzzy Name match
+        if (savedName.isNotEmpty()) {
+            const auto& types = globalPluginList.getTypes();
+            // Try exact name
+            for (const auto& type : types) {
+                if (type.name == savedName) {
+                    desc = type;
+                    return true;
+                }
+            }
+            // Try stripped name (e.g. "Serum 2" -> "Serum")
+            juce::String cleanName = savedName.trim();
+            int lastSpace = cleanName.lastIndexOfChar(' ');
+            if (lastSpace > 0) {
+                juce::String baseName = cleanName.substring(0, lastSpace);
+                for (const auto& type : types) {
+                    if (type.name == baseName) {
+                        desc = type;
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    };
+
+    // 3. First Attempt
+    bool found = findPluginInList();
+
+    // 4. If not found and scan allowed, start BACKGROUND scan
+    if (!found) {
+        if (allowScan) {
+            // Setup callback to try again (with allowScan=false to prevent loops)
+            std::weak_ptr<VST3Node> weakSelf = std::dynamic_pointer_cast<VST3Node>(shared_from_this());
+            
+            pendingScanAction = [weakSelf]() {
+                if (auto self = weakSelf.lock()) {
+                    self->restoreFromState(false);
+                }
+            };
+
+            // Trigger scan if not already running
+            if (!isScanning()) {
+                scanStandardPlugins();
+            }
+            // If already scanning, the handleScanFinished() will eventually fire 
+            // and execute our pendingScanAction.
+        }
+        return; // Return immediately to unblock UI
+    }
+
+    // 6. Load if found
+    if (found) {
+        std::weak_ptr<VST3Node> weakSelf = std::dynamic_pointer_cast<VST3Node>(shared_from_this());
+
+        formatManager->createPluginInstanceAsync(desc, 44100.0, 512,
+            [weakSelf, savedStateData, savedName](std::unique_ptr<juce::AudioPluginInstance> instance, const juce::String& error) mutable {
+                if (auto self = weakSelf.lock()) {
+                    
+                    // Finish load (updates hostedPlugin pointer)
+                    self->finishLoad(std::move(instance), error, savedName);
+
+                    // Restore internal plugin state (knobs etc)
+                    if (self->hostedPlugin && savedStateData.isNotEmpty()) {
+                        juce::MemoryBlock mb;
+                        if (mb.fromBase64Encoding(savedStateData)) {
+                             std::lock_guard<std::recursive_mutex> lock(self->processor.getMutex());
+                             self->hostedPlugin->setStateInformation(mb.getData(), (int)mb.getSize());
+                        }
+                    }
+                }
+            }
+        );
+    }
+}
+
+void VST3Node::flushPluginStateToValueTree() {
+    if (!hostedPlugin) return;
+
+    // Update ID
+    getMutableNodeState().setProperty("pluginId", 
+        hostedPlugin->getPluginDescription().createIdentifierString(), 
+        &processor.undoManager);
+
+    // Update State Blob
+    juce::MemoryBlock state;
+    hostedPlugin->getStateInformation(state);
+    getMutableNodeState().setProperty("pluginState", 
+        state.toBase64Encoding(), 
+        &processor.undoManager);
+}
+
+void VST3Node::handleScanFinished() {
+    // We try to capture a weak reference to ourselves.
+    // If we are in the process of destruction, this might throw or fail gracefully.
+    try {
+        std::weak_ptr<VST3Node> weakSelf = std::dynamic_pointer_cast<VST3Node>(shared_from_this());
+        
+        juce::MessageManager::callAsync([weakSelf]() {
+            if (auto self = weakSelf.lock()) {
+                if (self->pendingScanAction) {
+                    auto action = self->pendingScanAction;
+                    self->pendingScanAction = nullptr;
+                    action();
+                }
+            }
+        });
+    } catch (...) {}
 }

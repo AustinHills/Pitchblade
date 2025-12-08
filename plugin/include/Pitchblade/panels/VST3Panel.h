@@ -85,6 +85,10 @@ public:
     std::unique_ptr<juce::XmlElement> toXml() const override;
     void loadFromXml(const juce::XmlElement& xml) override;
 
+    // New methods for ValueTree based state handling
+    void restoreFromState(bool allowScan = true); 
+    void flushPluginStateToValueTree();
+
     //Public API stuff
     
     //Initializes the format manager (lazy load on Message Thread)
@@ -112,6 +116,8 @@ public:
     //Analysis Data Accessors
     float getCurrentLevelDb() const { return currentLevelDb.load(); }
     bool getNextFFTBlock(std::vector<float>& dest);
+
+    static std::recursive_mutex pluginListMutex;
 
 private:
     //Hosting stuff
@@ -152,5 +158,8 @@ private:
     //Helper to finish loading on MessageThread
     void finishLoad(std::unique_ptr<juce::AudioPluginInstance> instance, const juce::String& errorMsg, const juce::String& preferredName = {});
     
+    std::function<void()> pendingScanAction;
+    void handleScanFinished();
+
     friend class ScannerThread;
 };
