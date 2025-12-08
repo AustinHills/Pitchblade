@@ -112,7 +112,7 @@ public:
     void valueTreeChildRemoved(juce::ValueTree& parentTree, juce::ValueTree& childWhichHasBeenRemoved, int indexFromWhichChildWasRemoved) override;
     void valueTreeChildOrderChanged(juce::ValueTree& parentTree, int oldIndex, int newIndex) override;
     // We can ignore propertyChanged for structure, as nodes handle their own params
-    void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&) override {}
+    void valueTreePropertyChanged(juce::ValueTree& tree, const juce::Identifier& property) override;
 	
 
 	// preset management

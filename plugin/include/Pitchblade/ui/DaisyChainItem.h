@@ -144,7 +144,8 @@ public:
 
     // setter getter for chain mode
     void setChainModeId(int id) {
-        chainModeId = juce::jlimit(1, 4, id);
+        // Fix: Update limit to include 5 (LeftDouble)
+        chainModeId = juce::jlimit(1, 5, id); 
         modeButton.setButtonText(chaingID(chainModeId));
         modeButton.setEnabled(true);
 
@@ -162,8 +163,9 @@ public:
         switch (chainModeId) {
             case 1:  bg = Colors::accentTeal;       label = "D";         tooltipKey = "mode.down"; break;       // down         teal
             case 2:  bg = Colors::accentPink;       label = "S";         tooltipKey = "mode.split"; break;      // split        light pink 
-            case 3:  bg = Colors::accentPurple;     label = "DD";        tooltipKey = "mode.double"; break;     // doubleDown   purple
+            case 3:  bg = Colors::accentPurple;     label = "DD";        tooltipKey = "mode.double"; break;     // Right Double purple
             case 4:  bg = Colors::accentBlue;       label = "U";         tooltipKey = "mode.unite"; break;      // unite        blue
+            case 5:  bg = Colors::accentPurple;     label = "DD";        tooltipKey = "mode.double"; break;     // Left Double  purple (New)
             default: bg = Colors::accent;           label = "M";         tooltipKey = "mode.unknown"; break;
         }
         modeButton.setButtonText(label);

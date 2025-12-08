@@ -545,42 +545,102 @@ void AudioPluginAudioProcessor::syncChainFromState() {
     auto chainState = apvts.state.getChildWithName("Chain");
     std::vector<std::shared_ptr<EffectNode>> newNodes;
     
-    // 1. Rebuild list from ValueTree order
+    // 1. Sync Objects
     for (auto child : chainState) {
-        // Check if we already have this node instantiated (preserve DSP state/pointers)
         auto it = std::find_if(effectNodes.begin(), effectNodes.end(), 
             [&](const std::shared_ptr<EffectNode>& n) { return n->getNodeStateConst() == child; });
             
+        std::shared_ptr<EffectNode> node;
         if (it != effectNodes.end()) {
-            newNodes.push_back(*it);
+            node = *it;
         } else {
-            // New node added via undo/redo or load
-            auto newNode = createNodeFromState(child);
-            if (newNode) newNodes.push_back(newNode);
+            node = createNodeFromState(child);
+        }
+
+        if (node) {
+            node->clearConnections();
+            // Reset to "Stored User Intent" (1=Down, 3=DoubleDown)
+            // We use this to group them, then overwrite with DSP modes later.
+            int storedMode = child.getProperty("chainMode", 1);
+            node->chainMode = static_cast<ChainMode>(storedMode);
+            newNodes.push_back(node);
         }
     }
     
     effectNodes = newNodes;
 
-    // 2. Reconnect DSP chain logic (Down, Split, Unite, etc.) based on order + chainMode
-    // Clear connections
-    for (auto& n : effectNodes) if (n) n->clearConnections();
+    // 2. Group into Rows
+    struct Row {
+        std::shared_ptr<EffectNode> left;
+        std::shared_ptr<EffectNode> right;
+        bool isDouble() const { return right != nullptr; }
+    };
+    std::vector<Row> rows;
 
-    // Re-apply connections logic (copied from your old applyPendingLayout but simplified)
-    // Note: Since we don't have "Rows" in APVTS, we assume linear order,
-    // but we can look at the ChainMode of the nodes to decide routing.
-    // Or, for simplicity in this refactor, we stick to the basic "Next connects to Next"
-    // unless you want to preserve the specific visual Row logic in the DSP.
-    
-    // Assuming simple linear DSP for now to ensure Undo works first:
-    for (size_t i = 0; i + 1 < effectNodes.size(); ++i) {
-        if (effectNodes[i] && effectNodes[i+1])
-            effectNodes[i]->connectTo(effectNodes[i+1]);
+    for (auto& node : effectNodes) {
+        // If marked as DoubleDown (3) -> It is a Right Side Candidate
+        if (node->chainMode == ChainMode::DoubleDown) {
+            if (!rows.empty() && rows.back().right == nullptr) {
+                rows.back().right = node;
+            } else {
+                // Orphaned right node? Treat as new Left.
+                rows.push_back({ node, nullptr });
+            }
+        } 
+        else {
+            // Standard Node -> New Left Side
+            rows.push_back({ node, nullptr });
+        }
     }
 
-    // Update root and active
+    // 3. Apply Calculated DSP Modes & Connections
+    for (size_t i = 0; i < rows.size(); ++i) {
+        auto& current = rows[i];
+        
+        // -- Configure CURRENT Row Modes --
+        if (current.isDouble()) {
+            // Explicitly set Left -> LeftDouble (5) and Right -> DoubleDown (3)
+            current.left->chainMode = ChainMode::LeftDouble;
+            current.right->chainMode = ChainMode::DoubleDown;
+        } else {
+            // Single: Default to Down (1) ONLY if it wasn't already set to Unite (4)
+            // by the previous row's logic.
+            if (current.left->chainMode != ChainMode::Unite) {
+                current.left->chainMode = ChainMode::Down;
+            }
+        }
+
+        // -- Connect to NEXT Row --
+        if (i + 1 < rows.size()) {
+            auto& next = rows[i + 1];
+
+            if (!current.isDouble() && !next.isDouble()) {
+                // Single -> Single
+                current.left->connectTo(next.left);
+            }
+            else if (!current.isDouble() && next.isDouble()) {
+                // Single -> Double (SPLIT)
+                current.left->connectTo(next.left);
+                current.left->connectTo(next.right);
+                current.left->chainMode = ChainMode::Split; // Force Split
+            }
+            else if (current.isDouble() && !next.isDouble()) {
+                // Double -> Single (UNITE)
+                current.left->connectTo(next.left);
+                current.right->connectTo(next.left);
+                next.left->chainMode = ChainMode::Unite;    // Force Next to Unite
+            }
+            else if (current.isDouble() && next.isDouble()) {
+                // Double -> Double (PARALLEL)
+                current.left->connectTo(next.left);
+                current.right->connectTo(next.right);
+                // Preserve LeftDouble/DoubleDown modes
+            }
+        }
+    }
+
     activeNodes = std::make_shared<std::vector<std::shared_ptr<EffectNode>>>(effectNodes);
-    rootNode = effectNodes.empty() ? nullptr : effectNodes.front();
+    rootNode = rows.empty() ? nullptr : rows.front().left;
 }
 
 //Listeners
@@ -615,3 +675,12 @@ void AudioPluginAudioProcessor::triggerUIRebuild() {
             juce::MessageManager::callAsync([ed]() { ed->rebuildAndSyncUI(); });
         }
     }
+
+void AudioPluginAudioProcessor::valueTreePropertyChanged(juce::ValueTree& tree, const juce::Identifier& property) {
+    // If the chain structure property "chainMode" changes, we must rebuild the DSP graph.
+    // We also listen for "name" to update UI labels if needed.
+    if (property.toString() == "chainMode" || property.toString() == "name") {
+        syncChainFromState();
+        triggerUIRebuild();
+    }
+}

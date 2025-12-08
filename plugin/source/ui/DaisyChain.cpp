@@ -157,13 +157,10 @@ static std::tuple<int, bool, bool> findRowAndSide(const std::vector<DaisyChain::
 
 // rebuilds the UI from current rows and effectNodes
 void DaisyChain::rebuild() {
-    // Clear UI
     for (auto* it : items) effectsContainer.removeChildComponent(it);
     items.clear(true);
 
-    // Get the authoritative list from processor (which is synced to VT)
     auto& nodes = processorRef.getEffectNodes();
-    
     DaisyChainItem* currentRow = nullptr;
     
     for (int i = 0; i < nodes.size(); ++i) {
@@ -172,36 +169,40 @@ void DaisyChain::rebuild() {
         
         bool isRightSide = false;
         
-        // Determine if this should be on the right side of the previous row
-        if (currentRow != nullptr && node->chainMode == ChainMode::DoubleDown) {
+        // Logic: A node is on the Right Side ONLY if:
+        // 1. We have a current row
+        // 2. That row has space
+        // 3. This node is strictly ChainMode::DoubleDown (3)
+        // (LeftDouble (5) must start a new row)
+        if (currentRow != nullptr && !currentRow->hasRight && node->chainMode == ChainMode::DoubleDown) {
             isRightSide = true;
         }
         
         if (isRightSide) {
-            // Add to existing row
+            // Add to Right
             currentRow->setSecondaryEffect(node->effectName);
             currentRow->updateSecondaryBypassVisual(node->bypassed);
             
-            // [Optional] Wire right-side bypass if you want that working too
             currentRow->onSecondaryBypassChanged = [this, node](int index, bool b) {
                 node->bypassed = b;
                 if (onAnyBypassChanged) onAnyBypassChanged();
             };
-
         } else {
-            // New Row
+            // Start New Row
             currentRow = new DaisyChainItem(node->effectName, i);
             effectsContainer.addAndMakeVisible(currentRow);
             items.add(currentRow);
             
             currentRow->updateBypassVisual(node->bypassed);
             
-            // [FIX] Assign the reorder callback so Drag & Drop works
+            // Set Visuals (D, S, DD, U)
+            currentRow->setChainModeId(static_cast<int>(node->chainMode));
+            currentRow->updateModeVisual();
+
             currentRow->onReorder = [this](int kind, juce::String name, int targetRow) {
                 handleReorder(kind, name, targetRow);
             };
 
-            // [FIX] Assign bypass callback so clicking 'B' works
             currentRow->onBypassChanged = [this, node](int index, bool b) {
                 node->bypassed = b;
                 if (onAnyBypassChanged) onAnyBypassChanged();
@@ -219,7 +220,7 @@ void DaisyChain::handleReorder(int kind, const juce::String& dragName, int targe
 
     auto chain = processorRef.apvts.state.getChildWithName("Chain");
     
-    // Find index of dragged node in ValueTree
+    // 1. Find index of dragged node
     int oldIndex = -1;
     for (int i = 0; i < chain.getNumChildren(); ++i) {
         if (chain.getChild(i).getProperty("name") == dragName) {
@@ -227,25 +228,56 @@ void DaisyChain::handleReorder(int kind, const juce::String& dragName, int targe
             break;
         }
     }
-    
     if (oldIndex == -1) return;
 
-    // Map targetRow (UI row index) to linear index in ValueTree
-    // Since rebuild() maps ValueTree children linearly to rows (mostly), 
-    // we can approximate the target index.
-    int newIndex = juce::jlimit(0, chain.getNumChildren() - 1, targetRow);
-    
-    // Check if target is actually a "Double Row" slot (kind == -2)
-    // For now, standard reorder:
-    if (oldIndex != newIndex) {
-        chain.moveChild(oldIndex, newIndex, &processorRef.undoManager);
-    }
-    
-    // If double row logic is needed here (combining nodes):
+    // 2. Identify Target Index
+    // DaisyChainItem passes the linear index of the node that starts the row.
+    // We can use this directly.
+    int targetIndex = targetRow;
+
+    // Clamp to valid range just in case
+    targetIndex = juce::jlimit(0, chain.getNumChildren(), targetIndex);
+
+    processorRef.undoManager.beginNewTransaction();
+
     if (kind == -2) {
-        // Logic to set "chainMode" property to DoubleDown on the target node
-        // would go here, interacting with processorRef.undoManager
+        // === Drop to RIGHT (Make Parallel) ===
+        // User dropped onto the right handle of the node at 'targetIndex'.
+        // We want to insert strictly AFTER this node.
+        
+        auto draggedNode = chain.getChild(oldIndex);
+        draggedNode.setProperty("chainMode", 3, &processorRef.undoManager); // 3 = DoubleDown / Right Side
+
+        // Calculate insertion point (Always index + 1 for "Right Side")
+        int insertIndex = targetIndex + 1;
+        
+        // Adjust if dragging from above the target (shift down)
+        // If oldIndex is 0 and we want to insert at 2 (which becomes 1).
+        if (oldIndex < insertIndex) insertIndex--;
+
+        chain.moveChild(oldIndex, insertIndex, &processorRef.undoManager);
+    } 
+    else {
+        // === Drop Insert (Vertical) ===
+        // User dropped Above or Below a row.
+        // targetIndex represents the desired slot.
+        
+        auto draggedNode = chain.getChild(oldIndex);
+        
+        // Reset mode to Down (1). 
+        // Note: Logic in syncChainFromState will automatically upgrade this to 
+        // Split/Unite/LeftDouble based on context later.
+        draggedNode.setProperty("chainMode", 1, &processorRef.undoManager); 
+
+        // moveChild handles the index shift logic internally for the move itself,
+        // we just provide the destination index in the current list state?
+        // Actually JUCE moveChild behavior: "The new index that the child should be moved to."
+        // If we move 0 to 3: 0 is removed, remaining shift, inserted at 3.
+        
+        chain.moveChild(oldIndex, targetIndex, &processorRef.undoManager);
     }
+
+    processorRef.undoManager.beginNewTransaction();
 }
 
 // layout the daisy chain component
@@ -686,11 +718,47 @@ void DaisyChain::showDeleteMenu() {
         if (index < 0 || index >= effectNodes.size()) return;
 
         // Get the ValueTree corresponding to this node
-        // We assume effectNodes vector is in sync with Chain children order
         auto chain = processorRef.apvts.state.getChildWithName("Chain");
         auto child = chain.getChild(index);
         
         if (child.isValid()) {
+            // FIX: Unbind the partner node before deleting to prevent accidental merging.
+            
+            // We use effectNodes (C++ objects) to check the current topology
+            // because they hold the calculated ChainMode (LeftDouble vs DoubleDown).
+            if (index < effectNodes.size()) {
+                auto node = effectNodes[index];
+                
+                // Case 1: Deleting the LEFT node of a pair
+                // The survivor is on the RIGHT (index + 1).
+                if (node->chainMode == ChainMode::LeftDouble) {
+                     if (index + 1 < effectNodes.size()) {
+                         auto nextNode = effectNodes[index + 1];
+                         // If the next node is indeed the partner (DoubleDown)
+                         if (nextNode->chainMode == ChainMode::DoubleDown) {
+                             // Reset the survivor's property to Down (1)
+                             // This stops it from snapping to the row above.
+                             auto nextChild = chain.getChild(index + 1);
+                             nextChild.setProperty("chainMode", 1, &processorRef.undoManager);
+                         }
+                     }
+                }
+                // Case 2: Deleting the RIGHT node of a pair
+                // The survivor is on the LEFT (index - 1).
+                else if (node->chainMode == ChainMode::DoubleDown) {
+                    if (index - 1 >= 0) {
+                        auto prevNode = effectNodes[index - 1];
+                        // If the prev node is the partner (LeftDouble)
+                        if (prevNode->chainMode == ChainMode::LeftDouble) {
+                             // Reset the survivor to Down (1)
+                             auto prevChild = chain.getChild(index - 1);
+                             prevChild.setProperty("chainMode", 1, &processorRef.undoManager);
+                        }
+                    }
+                }
+            }
+
+            // Now delete the target node
             chain.removeChild(child, &processorRef.undoManager);
 
             processorRef.undoManager.beginNewTransaction();
