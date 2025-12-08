@@ -359,6 +359,7 @@ void AudioPluginAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
         // Load default preset logic, but via ValueTree transactions
         // Note: We don't use UndoManager here as this is initialization
         loadDefaultPreset("default"); 
+        syncChainFromState();
     } else {
         // Just sync vector to existing state
         syncChainFromState();
@@ -573,7 +574,7 @@ void AudioPluginAudioProcessor::syncChainFromState() {
 //Listeners
 
 void AudioPluginAudioProcessor::valueTreeChildAdded(juce::ValueTree& parent, juce::ValueTree& child) {
-    if (parent.hasType("Chain")) {
+    if (parent.hasType("Chain") || child.hasType("Chain")) {
         syncChainFromState();
         // Trigger UI rebuild
         if (auto* ed = dynamic_cast<AudioPluginAudioProcessorEditor*>(getActiveEditor()))
@@ -582,7 +583,7 @@ void AudioPluginAudioProcessor::valueTreeChildAdded(juce::ValueTree& parent, juc
 }
 
 void AudioPluginAudioProcessor::valueTreeChildRemoved(juce::ValueTree& parent, juce::ValueTree& child, int) {
-    if (parent.hasType("Chain")) {
+    if (parent.hasType("Chain") || child.hasType("Chain")) {
         syncChainFromState();
         if (auto* ed = dynamic_cast<AudioPluginAudioProcessorEditor*>(getActiveEditor()))
             juce::MessageManager::callAsync([ed]() { ed->rebuildAndSyncUI(); });

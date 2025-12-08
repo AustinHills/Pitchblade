@@ -85,6 +85,10 @@ public:
     void valueTreeChildRemoved(juce::ValueTree&, juce::ValueTree&, int) override { rebuild(); }
     void valueTreeChildOrderChanged(juce::ValueTree&, int, int) override { rebuild(); }
 
+    void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier& property) override {
+        if (property.toString() == "name") rebuild();
+    }
+
 //private:
 	// reorder handler for multi row support
     // kind: -1 vertical insert, -2 right-slot insert (double row)

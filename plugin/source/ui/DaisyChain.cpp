@@ -144,12 +144,7 @@ void DaisyChain::rebuild() {
     items.clear(true);
 
     // Get the authoritative list from processor (which is synced to VT)
-    // Or iterate the VT directly. Let's use effectNodes as it contains the params/bypass state objects.
     auto& nodes = processorRef.getEffectNodes();
-    
-    // Simple Linear Rebuild (Every node is a row)
-    // To restore "Double Row" logic, you would iterate nodes and check chainMode.
-    // If current node is DoubleDown, it appends to previous row instead of making new one.
     
     DaisyChainItem* currentRow = nullptr;
     
@@ -160,7 +155,6 @@ void DaisyChain::rebuild() {
         bool isRightSide = false;
         
         // Determine if this should be on the right side of the previous row
-        // This requires your nodes to persist their ChainMode correctly in the ValueTree
         if (currentRow != nullptr && node->chainMode == ChainMode::DoubleDown) {
             isRightSide = true;
         }
@@ -169,7 +163,13 @@ void DaisyChain::rebuild() {
             // Add to existing row
             currentRow->setSecondaryEffect(node->effectName);
             currentRow->updateSecondaryBypassVisual(node->bypassed);
-            // ... setup right side callbacks ...
+            
+            // [Optional] Wire right-side bypass if you want that working too
+            currentRow->onSecondaryBypassChanged = [this, node](int index, bool b) {
+                node->bypassed = b;
+                if (onAnyBypassChanged) onAnyBypassChanged();
+            };
+
         } else {
             // New Row
             currentRow = new DaisyChainItem(node->effectName, i);
@@ -177,7 +177,17 @@ void DaisyChain::rebuild() {
             items.add(currentRow);
             
             currentRow->updateBypassVisual(node->bypassed);
-            // ... setup left side callbacks ...
+            
+            // [FIX] Assign the reorder callback so Drag & Drop works
+            currentRow->onReorder = [this](int kind, juce::String name, int targetRow) {
+                handleReorder(kind, name, targetRow);
+            };
+
+            // [FIX] Assign bypass callback so clicking 'B' works
+            currentRow->onBypassChanged = [this, node](int index, bool b) {
+                node->bypassed = b;
+                if (onAnyBypassChanged) onAnyBypassChanged();
+            };
         }
     }
 
@@ -573,6 +583,8 @@ void DaisyChain::showAddMenu() {
         
         // The listener in PluginProcessor will instantiate the C++ object.
         // The listener in DaisyChain will call rebuild().
+
+        processorRef.undoManager.beginNewTransaction();
     });
 }
 
@@ -631,6 +643,8 @@ void DaisyChain::showDuplicateMenu() {
         // which creates the Node, updates the vector, and triggers the UI rebuild.
         auto chain = processorRef.apvts.state.getChildWithName("Chain");
         chain.addChild(newState, -1, &processorRef.undoManager);
+
+        processorRef.undoManager.beginNewTransaction();
     });
 }
 
@@ -660,6 +674,8 @@ void DaisyChain::showDeleteMenu() {
         
         if (child.isValid()) {
             chain.removeChild(child, &processorRef.undoManager);
+
+            processorRef.undoManager.beginNewTransaction();
         }
     });
 }
