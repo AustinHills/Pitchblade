@@ -89,12 +89,6 @@ public:
     
     //Initializes the format manager (lazy load on Message Thread)
     void initializeHosting(); 
-    
-    //Syncs the internal list with the global APVTS cache
-    void syncFromGlobalCache(); 
-    
-    //Saves a newly scanned list to the global APVTS cache
-    void saveListToGlobalCache(const juce::ValueTree& list);
 
     //Starts the background scanning thread
     void scanStandardPlugins();
@@ -122,7 +116,7 @@ public:
 private:
     //Hosting stuff
     std::unique_ptr<juce::AudioPluginFormatManager> formatManager;
-    juce::KnownPluginList knownPluginList; 
+    static juce::KnownPluginList globalPluginList; 
     std::unique_ptr<juce::AudioPluginInstance> hostedPlugin;
     
     //Name string for display (separate from node ID)

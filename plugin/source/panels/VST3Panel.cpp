@@ -2,6 +2,9 @@
 
 #include "Pitchblade/panels/VST3Panel.h"
 
+//Static global plugin list
+juce::KnownPluginList VST3Node::globalPluginList;
+
 //Local Window Class
 //This handles the VST3 editor window and ensures it deletes itself properly
 class VST3PluginWindow : public juce::DocumentWindow
@@ -54,7 +57,7 @@ void VST3Node::ScannerThread::run()
     #endif
 
     //Scanner
-    juce::PluginDirectoryScanner scanner(owner.knownPluginList, 
+    juce::PluginDirectoryScanner scanner(owner.globalPluginList, 
                                          *vst3Format, 
                                          searchPath, 
                                          true, 
@@ -68,33 +71,8 @@ void VST3Node::ScannerThread::run()
         progress.store(scanner.getProgress());
     }
 
-    //Save to Global Cache if finished
     if (!threadShouldExit()) {
-        //Moved this here so it only is set to 100% if it is actually finished
         progress.store(1.0f);
-
-        auto xml = owner.knownPluginList.createXml();
-        if (xml) {
-            auto cacheTree = juce::ValueTree::fromXml(*xml);
-            auto globalTree = cacheTree.createCopy(); 
-            globalTree.setProperty("id", "CachedVST3List", nullptr); 
-
-            //Get a weak pointer to ensure we don't crash if the node is deleted
-            std::weak_ptr<VST3Node> weakNode;
-            try {
-                auto sharedOwner = std::dynamic_pointer_cast<VST3Node>(owner.shared_from_this());
-                if (sharedOwner) weakNode = sharedOwner;
-            } catch (...) {
-                return;
-            }
-
-            //Update APVTS on message thread
-            juce::MessageManager::callAsync([weakNode, globalTree]() {
-                if (auto node = weakNode.lock()) {
-                    node->saveListToGlobalCache(globalTree);
-                }
-            });
-        }
     }
 }
 
@@ -157,7 +135,6 @@ VST3Node::VST3Node(AudioPluginAudioProcessor& proc, const juce::ValueTree& state
     if (!formatManager) {
         formatManager = std::make_unique<juce::AudioPluginFormatManager>();
         formatManager->addDefaultFormats();
-        syncFromGlobalCache();
     }
 }
 
@@ -298,39 +275,6 @@ void VST3Node::initializeHosting() {
     if (!formatManager) {
         formatManager = std::make_unique<juce::AudioPluginFormatManager>();
         formatManager->addDefaultFormats();
-        syncFromGlobalCache();
-    }
-}
-
-void VST3Node::saveListToGlobalCache(const juce::ValueTree& list) {
-    auto& root = processor.apvts.state;
-    //Remove old cache first
-    for (int i = root.getNumChildren(); --i >= 0;)
-        if (root.getChild(i).getProperty("id").toString() == "CachedVST3List")
-            root.removeChild(i, nullptr);
-    
-    //Add new cache
-    root.addChild(list, -1, nullptr);
-}
-
-void VST3Node::syncFromGlobalCache() {
-    auto& root = processor.apvts.state;
-    juce::ValueTree cache;
-    
-    //Find existing cache
-    for (int i = 0; i < root.getNumChildren(); ++i) {
-        if (root.getChild(i).getProperty("id").toString() == "CachedVST3List") {
-            cache = root.getChild(i);
-            break;
-        }
-    }
-
-    //Load if valid
-    if (cache.isValid()) {
-        auto xml = cache.createXml();
-        if (xml) {
-            knownPluginList.recreateFromXml(*xml);
-        }
     }
 }
 
@@ -400,12 +344,12 @@ float VST3Node::getScanProgress() const {
 }
 
 const juce::KnownPluginList& VST3Node::getPluginList() const {
-    return knownPluginList;
+    return globalPluginList;
 }
 
 void VST3Node::loadPluginById(const juce::String& pluginId) {
     initializeHosting();
-    auto type = knownPluginList.getTypeForIdentifierString(pluginId);
+    auto type = globalPluginList.getTypeForIdentifierString(pluginId);
     if (!type) return;
 
     //Async load to prevent freezing
@@ -555,10 +499,10 @@ std::unique_ptr<juce::XmlElement> VST3Node::toXml() const {
 }
 
 void VST3Node::loadFromXml(const juce::XmlElement& xml) {
-    // Initialize hosting to populate the knownPluginList
+    // Initialize hosting to populate formatManager
     initializeHosting();
 
-    // Get the display name (e.g. "Serum 2") and the ID
+    // Get the display name and ID
     juce::String name = xml.getStringAttribute("name");
     juce::String pluginId = xml.getStringAttribute("pluginId");
     
@@ -569,32 +513,31 @@ void VST3Node::loadFromXml(const juce::XmlElement& xml) {
     }
 
     juce::PluginDescription desc;
-    bool found = false;
 
-    // 1. Try to find by unique Plugin ID (Reliable)
-    if (pluginId.isNotEmpty()) {
-        // [FIX] Changed 'auto*' to 'auto' because getTypeForIdentifierString returns a unique_ptr
-        if (auto type = knownPluginList.getTypeForIdentifierString(pluginId)) {
-            desc = *type;
-            found = true;
-        }
-    }
-
-    // 2. Fallback: Find by name
-    if (!found && name.isNotEmpty()) {
-        const auto& types = knownPluginList.getTypes();
-        
-        // A. Try Exact Match
-        for (const auto& type : types) { 
-            if (type.name == name) {
-                desc = type;
-                found = true;
-                break;
+    // Helper lambda to find the plugin description in the global list
+    // Returns true if found and updates 'desc'
+    auto findPluginInList = [&]() -> bool {
+        // 1. Try to find by unique Plugin ID (Most Reliable)
+        if (pluginId.isNotEmpty()) {
+            if (auto type = globalPluginList.getTypeForIdentifierString(pluginId)) {
+                desc = *type;
+                return true;
             }
         }
 
-        // B. Try Stripped Name (e.g. find "Serum" if saved as "Serum 2")
-        if (!found) {
+        // 2. Fallback: Find by name
+        if (name.isNotEmpty()) {
+            const auto& types = globalPluginList.getTypes();
+            
+            // A. Try Exact Match
+            for (const auto& type : types) { 
+                if (type.name == name) {
+                    desc = type;
+                    return true;
+                }
+            }
+
+            // B. Try Stripped Name (e.g. find "Serum" if saved as "Serum 2")
             juce::String cleanName = name.trim();
             int lastSpace = cleanName.lastIndexOfChar(' ');
             if (lastSpace > 0) {
@@ -608,28 +551,68 @@ void VST3Node::loadFromXml(const juce::XmlElement& xml) {
                     for (const auto& type : types) {
                         if (type.name == baseName) {
                             desc = type;
-                            found = true;
-                            break;
+                            return true;
                         }
                     }
                 }
             }
         }
+        return false;
+    };
+
+    // First Lookup Attempt
+    bool found = findPluginInList();
+
+    // If not found, perform a synchronous scan and try again
+    if (!found) {
+        juce::AudioPluginFormat* vst3Format = nullptr;
+        if (formatManager) {
+            for (int i = 0; i < formatManager->getNumFormats(); ++i) {
+                if (formatManager->getFormat(i)->getName() == "VST3") {
+                    vst3Format = formatManager->getFormat(i);
+                    break;
+                }
+            }
+        }
+
+        if (vst3Format) {
+            juce::FileSearchPath searchPath;
+            #if JUCE_WINDOWS
+                searchPath.add(juce::File("C:\\Program Files\\Common Files\\VST3").getFullPathName());
+                searchPath.add(juce::File("C:\\Program Files (x86)\\Common Files\\VST3").getFullPathName());
+            #elif JUCE_MAC
+                searchPath.add("/Library/Audio/Plug-Ins/VST3");
+                searchPath.add("~/Library/Audio/Plug-Ins/VST3");
+            #else
+                searchPath.add("/usr/lib/vst3");
+            #endif
+
+            // Sync scan into global list
+            juce::PluginDirectoryScanner scanner(globalPluginList, *vst3Format, searchPath, true, juce::File());
+            juce::String scanName;
+            while (scanner.scanNextFile(true, scanName)) {
+                // block until finished
+            }
+        }
+
+        // Second Lookup Attempt after scan
+        found = findPluginInList();
     }
 
     if (found) {
         // Async Load
         std::weak_ptr<VST3Node> weakSelf = std::dynamic_pointer_cast<VST3Node>(shared_from_this());
 
-        // We capture 'name' to pass it as the preferred name
         formatManager->createPluginInstanceAsync(desc, 44100.0, 512, 
             [weakSelf, state, name](std::unique_ptr<juce::AudioPluginInstance> instance, const juce::String& error) mutable {
                 if (auto self = weakSelf.lock()) {
-                    // Pass 'name' as preferredName so we restore "Serum 2" correctly
+                    // Finish load (updates hostedPlugin pointer)
                     self->finishLoad(std::move(instance), error, name);
                     
-                    // Apply state if load succeeded
+                    // Apply state safely under lock
+                    // [FIX] Locked the mutex to prevent race conditions during state restoration
                     if (self->hostedPlugin && state.getSize() > 0) {
+                        std::lock_guard<std::recursive_mutex> lock(self->processor.getMutex());
                         self->hostedPlugin->setStateInformation(state.getData(), (int)state.getSize());
                     }
                 }

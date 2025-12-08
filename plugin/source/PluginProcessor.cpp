@@ -275,6 +275,8 @@ void AudioPluginAudioProcessor::loadPresetFromFile(const juce::File& file) {
             if (!apvts.state.getChildWithName("Chain").isValid())
                 apvts.state.addChild(juce::ValueTree("Chain"), -1, nullptr);
         }
+
+        triggerUIRebuild();
     }
 }
 
