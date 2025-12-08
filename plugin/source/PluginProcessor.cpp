@@ -252,6 +252,12 @@ static std::shared_ptr<EffectNode> findByName(const std::vector<std::shared_ptr<
 // saving presets to file
 void AudioPluginAudioProcessor::savePresetToFile(const juce::File& file) {
     std::lock_guard<std::recursive_mutex> lock(audioMutex);
+
+    // This allows VST3 nodes to write their opaque parameter chunk into the tree
+    for (auto& node : effectNodes) {
+        if (node) node->flushStateToValueTree();
+    }
+
     // apvts.state contains EVERYTHING: Params, Chain structure, Node UUIDs.
     auto xml = apvts.state.createXml();
     xml->setTagName("PitchbladePreset");

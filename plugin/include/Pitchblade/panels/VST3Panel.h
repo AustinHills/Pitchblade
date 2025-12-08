@@ -87,7 +87,6 @@ public:
 
     // New methods for ValueTree based state handling
     void restoreFromState(bool allowScan = true); 
-    void flushPluginStateToValueTree();
 
     //Public API stuff
     
@@ -118,6 +117,8 @@ public:
     bool getNextFFTBlock(std::vector<float>& dest);
 
     static std::recursive_mutex pluginListMutex;
+
+    void flushStateToValueTree() override;
 
 private:
     //Hosting stuff

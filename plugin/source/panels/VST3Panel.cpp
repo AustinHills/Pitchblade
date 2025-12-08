@@ -475,7 +475,7 @@ void VST3Node::finishLoad(std::unique_ptr<juce::AudioPluginInstance> instance, c
             hostedPlugin->prepareToPlay(sr, bs);
 
             // [FIX] Ensure the ValueTree has the plugin info for future saves
-            flushPluginStateToValueTree();
+            flushStateToValueTree();
 
             processor.triggerUIRebuild();
         }
@@ -779,22 +779,6 @@ void VST3Node::restoreFromState(bool allowScan) {
     }
 }
 
-void VST3Node::flushPluginStateToValueTree() {
-    if (!hostedPlugin) return;
-
-    // Update ID
-    getMutableNodeState().setProperty("pluginId", 
-        hostedPlugin->getPluginDescription().createIdentifierString(), 
-        &processor.undoManager);
-
-    // Update State Blob
-    juce::MemoryBlock state;
-    hostedPlugin->getStateInformation(state);
-    getMutableNodeState().setProperty("pluginState", 
-        state.toBase64Encoding(), 
-        &processor.undoManager);
-}
-
 void VST3Node::handleScanFinished() {
     // We try to capture a weak reference to ourselves.
     // If we are in the process of destruction, this might throw or fail gracefully.
@@ -811,4 +795,20 @@ void VST3Node::handleScanFinished() {
             }
         });
     } catch (...) {}
+}
+
+void VST3Node::flushStateToValueTree() {
+    if (!hostedPlugin) return;
+
+    // Update ID
+    getMutableNodeState().setProperty("pluginId", 
+        hostedPlugin->getPluginDescription().createIdentifierString(), 
+        &processor.undoManager);
+
+    // Update State Blob
+    juce::MemoryBlock state;
+    hostedPlugin->getStateInformation(state);
+    getMutableNodeState().setProperty("pluginState", 
+        state.toBase64Encoding(), 
+        &processor.undoManager);
 }

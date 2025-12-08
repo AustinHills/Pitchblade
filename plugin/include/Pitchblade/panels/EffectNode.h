@@ -135,6 +135,8 @@ public:
     void printNodeInfo() const {
         juce::Logger::outputDebugString("Node: " + effectName + " | Mode: " + juce::String(static_cast<int>(chainMode)));
     }
+
+    virtual void flushStateToValueTree() {}
     
 /////////////////////////////
 protected:
