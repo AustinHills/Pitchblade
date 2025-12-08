@@ -126,6 +126,8 @@ public:
 
     void forceCrash();
 
+    void triggerUIRebuild();
+
 private:
     //============================================================================== 
     //processors

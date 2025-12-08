@@ -486,6 +486,8 @@ void VST3Node::finishLoad(std::unique_ptr<juce::AudioPluginInstance> instance, c
             loadedPluginName = uniqueName;
 
             hostedPlugin->prepareToPlay(sr, bs);
+
+            processor.triggerUIRebuild();
         }
     } else {
         juce::NativeMessageBox::showMessageBoxAsync(juce::AlertWindow::WarningIcon, "Load Failed", errorMsg);

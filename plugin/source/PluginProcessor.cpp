@@ -597,3 +597,9 @@ void AudioPluginAudioProcessor::valueTreeChildOrderChanged(juce::ValueTree& pare
             juce::MessageManager::callAsync([ed]() { ed->rebuildAndSyncUI(); });
     }
 }
+
+void AudioPluginAudioProcessor::triggerUIRebuild() {
+        if (auto* ed = dynamic_cast<AudioPluginAudioProcessorEditor*>(getActiveEditor())) {
+            juce::MessageManager::callAsync([ed]() { ed->rebuildAndSyncUI(); });
+        }
+    }
