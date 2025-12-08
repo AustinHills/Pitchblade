@@ -71,7 +71,7 @@ class EqualizerNode : public EffectNode
 public:
     // create node with default apvts and register under EffectNodes
     explicit EqualizerNode(AudioPluginAudioProcessor& proc)
-        : EffectNode(proc, "EqualizerNode", "Equalizer")
+        : EffectNode(proc, "EqualizerNode", "Equalizer"), processor(proc)
     {
         juce::ValueTree st("EqualizerNode");
         st.setProperty("LowFreq", 200.0f, nullptr);
@@ -152,4 +152,6 @@ public:
         st.setProperty("HighFreq", (float)xml.getDoubleAttribute("HighFreq", 6000.0), nullptr);
         st.setProperty("HighGain", (float)xml.getDoubleAttribute("HighGain", 0.0), nullptr);
     }
+private:
+    AudioPluginAudioProcessor& processor;
 };
