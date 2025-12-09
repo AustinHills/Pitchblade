@@ -15,6 +15,7 @@
 #include "Pitchblade/panels/FormantPanel.h"
 #include "Pitchblade/panels/PitchPanel.h"
 #include "Pitchblade/panels/EqualizerPanel.h"
+#include "Pitchblade/panels/AdaptiveDeNoiserPanel.h"
 
 #include "Pitchblade/panels/VST3Panel.h"
 
@@ -600,10 +601,11 @@ void DaisyChain::showAddMenu() {
     menu.addItem(3, "Compressor");
     menu.addItem(4, "De-Esser");
     menu.addItem(5, "De-Noiser");
-    menu.addItem(6, "Formant",  !formantExists);    // disable when one already exists
-    menu.addItem(7, "Pitch",    !pitchExists);
-    menu.addItem(8, "Equalizer");
-    menu.addItem(9, "VST3");
+    menu.addItem(6, "Adaptive De-Noiser");
+    menu.addItem(7, "Formant",  !formantExists);    // disable when one already exists
+    menu.addItem(8, "Pitch",    !pitchExists);
+    menu.addItem(9, "Equalizer");
+    menu.addItem(99, "VST3");
 
 	// set look and feel
     menu.setLookAndFeel(&getLookAndFeel());
@@ -623,10 +625,11 @@ void DaisyChain::showAddMenu() {
             case 3: type="CompressorNode"; baseName="Compressor"; break;
             case 4: type="DeEsserNode"; baseName="De-Esser"; break;
             case 5: type="DeNoiserNode"; baseName="De-Noiser"; break;
-            case 6: type="FormantNode"; baseName="Formant"; break;
-            case 7: type="PitchNode"; baseName="Pitch"; break;
-            case 8: type="EqualizerNode"; baseName="Equalizer"; break;
-            case 9: type="VST3Node"; baseName="VST3"; break;
+            case 6: type="AdaptiveDeNoiserNode"; baseName="Adaptive De-Noiser"; break;
+            case 7: type="FormantNode"; baseName="Formant"; break;
+            case 8: type="PitchNode"; baseName="Pitch"; break;
+            case 9: type="EqualizerNode"; baseName="Equalizer"; break;
+            case 99: type="VST3Node"; baseName="VST3"; break;
         }
 
         if (type.isEmpty()) return;
