@@ -71,10 +71,12 @@ void SettingsPanel::resized(){
     auto area = getLocalBounds();
     area.removeFromTop(50);
 
-    //Position the Audio Settings button above the framerate dropdown
-    audioSettingsButton.setBounds(area.removeFromTop(40).reduced(20, 0));
+    if (juce::JUCEApplication::isStandaloneApp()){
+        //Position the Audio Settings button above the framerate dropdown
+        audioSettingsButton.setBounds(area.removeFromTop(40).reduced(20, 0));
 
-    area.removeFromTop(10); 
+        area.removeFromTop(10); 
+    }
 
     auto framerateArea = area.removeFromTop(40).reduced(20,0);
 
