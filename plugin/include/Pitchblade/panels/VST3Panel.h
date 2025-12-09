@@ -70,6 +70,8 @@ public:
     explicit VST3Node(AudioPluginAudioProcessor& proc);
     ~VST3Node() override;
 
+    VST3Node(AudioPluginAudioProcessor& proc, const juce::ValueTree& state);
+
     //Processing functions
     void process(AudioPluginAudioProcessor& proc, juce::AudioBuffer<float>& buffer) override;
     void prepareToPlay(double sampleRate, int samplesPerBlock);
@@ -83,16 +85,13 @@ public:
     std::unique_ptr<juce::XmlElement> toXml() const override;
     void loadFromXml(const juce::XmlElement& xml) override;
 
+    // New methods for ValueTree based state handling
+    void restoreFromState(bool allowScan = true); 
+
     //Public API stuff
     
     //Initializes the format manager (lazy load on Message Thread)
     void initializeHosting(); 
-    
-    //Syncs the internal list with the global APVTS cache
-    void syncFromGlobalCache(); 
-    
-    //Saves a newly scanned list to the global APVTS cache
-    void saveListToGlobalCache(const juce::ValueTree& list);
 
     //Starts the background scanning thread
     void scanStandardPlugins();
@@ -117,10 +116,14 @@ public:
     float getCurrentLevelDb() const { return currentLevelDb.load(); }
     bool getNextFFTBlock(std::vector<float>& dest);
 
+    static std::recursive_mutex pluginListMutex;
+
+    void flushStateToValueTree() override;
+
 private:
     //Hosting stuff
     std::unique_ptr<juce::AudioPluginFormatManager> formatManager;
-    juce::KnownPluginList knownPluginList; 
+    static juce::KnownPluginList globalPluginList; 
     std::unique_ptr<juce::AudioPluginInstance> hostedPlugin;
     
     //Name string for display (separate from node ID)
@@ -156,5 +159,8 @@ private:
     //Helper to finish loading on MessageThread
     void finishLoad(std::unique_ptr<juce::AudioPluginInstance> instance, const juce::String& errorMsg, const juce::String& preferredName = {});
     
+    std::function<void()> pendingScanAction;
+    void handleScanFinished();
+
     friend class ScannerThread;
 };

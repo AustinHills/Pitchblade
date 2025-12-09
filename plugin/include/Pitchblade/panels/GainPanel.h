@@ -74,8 +74,11 @@ public:
 		// ensure EffectNodes tree exists
         if (!processor.apvts.state.hasType("EffectNodes"))
             processor.apvts.state = juce::ValueTree("EffectNodes");
-		// add this node to processor state tree
-        processor.apvts.state.addChild(getMutableNodeState(), -1, nullptr);
+    }
+
+    GainNode(AudioPluginAudioProcessor& proc, const juce::ValueTree& existingState) 
+        : EffectNode(proc, existingState), processor(proc) {
+        // No property initialization needed, we are loading existing state
     }
 
 	// dsp read from local state instead of apvts

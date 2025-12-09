@@ -25,8 +25,9 @@
 enum class ChainMode {
     Down = 1,
     Split = 2,
-    DoubleDown = 3,
-    Unite = 4
+    DoubleDown = 3, // Now strictly "Right Double"
+    Unite = 4,
+    LeftDouble = 5  // New: "Left Double"
 };
 
 class AudioPluginAudioProcessor;    // forward declaration
@@ -135,6 +136,8 @@ public:
     void printNodeInfo() const {
         juce::Logger::outputDebugString("Node: " + effectName + " | Mode: " + juce::String(static_cast<int>(chainMode)));
     }
+
+    virtual void flushStateToValueTree() {}
     
 /////////////////////////////
 protected:
@@ -165,6 +168,7 @@ inline void EffectNode::processAndForward(AudioPluginAudioProcessor& proc, juce:
     //  chain mode rout behavior
     switch (chainMode) {
 	case ChainMode::Down:   
+    case ChainMode::LeftDouble: // New: Behaves same as Down (Single Output)
     { // Single output
 		if (!children.empty() && children.front()) {    
             children.front()->processAndForward(proc, temp);    // process first child
@@ -207,7 +211,7 @@ inline void EffectNode::processAndForward(AudioPluginAudioProcessor& proc, juce:
     }
 
 	case ChainMode::DoubleDown:
-    { // Two outputs summed
+    { // Two outputs summed (Original DoubleDown / Right Double behavior)
 		if (children.size() >= 2 && children[0] && children[1]) {   // need two valid children
 			juce::AudioBuffer<float> a(temp), b(temp);  // buffers for each branch
 			a.makeCopyOf(temp, true);           // copy inputs 

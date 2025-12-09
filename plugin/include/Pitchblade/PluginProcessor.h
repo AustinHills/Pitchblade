@@ -30,7 +30,7 @@
 class EffectNode;   // forward declaration for effectNode order 
 
 //==============================================================================
-class AudioPluginAudioProcessor final : public juce::AudioProcessor {
+class AudioPluginAudioProcessor final : public juce::AudioProcessor, public juce::ValueTree::Listener {
 public:
     //==============================
     AudioPluginAudioProcessor();
@@ -100,12 +100,20 @@ public:
     //hayley
     PitchCorrector& getPitchCorrector() { return pitchProcessor; }
 
-    //reyna 
-	// effect node chain management
-	void setRootNode(std::shared_ptr<EffectNode> node) { rootNode = std::move(node); }  // set root node for processing chain
-	struct Row { juce::String left, right; };                                           // processing chain row
-	void requestLayout(const std::vector<Row>& newRows);                                // request new layout for processing chain 
-    std::vector<Row> getCurrentLayoutRows();                                            //getter for current layout of rows for ui 
+    //Austin refactoring the daisy chain system
+    // Syncs the internal DSP vector to match the APVTS state
+    void syncChainFromState();
+
+    // Factory to create a node from a ValueTree state
+    std::shared_ptr<EffectNode> createNodeFromState(const juce::ValueTree& state);
+
+    // ================== VALUE TREE CALLBACKS ==================
+    void valueTreeChildAdded(juce::ValueTree& parentTree, juce::ValueTree& childWhichHasBeenAdded) override;
+    void valueTreeChildRemoved(juce::ValueTree& parentTree, juce::ValueTree& childWhichHasBeenRemoved, int indexFromWhichChildWasRemoved) override;
+    void valueTreeChildOrderChanged(juce::ValueTree& parentTree, int oldIndex, int newIndex) override;
+    // We can ignore propertyChanged for structure, as nodes handle their own params
+    void valueTreePropertyChanged(juce::ValueTree& tree, const juce::Identifier& property) override;
+	
 
 	// preset management
     void savePresetToFile(const juce::File& file);
@@ -117,6 +125,8 @@ public:
     juce::UndoManager undoManager;
 
     void forceCrash();
+
+    void triggerUIRebuild();
 
 private:
     //============================================================================== 
@@ -154,11 +164,6 @@ private:
     //reorder queue
 	std::recursive_mutex audioMutex;                    // mutex for audio thread safety
 	std::atomic<bool> reorderRequested{ false };        // flag for reorder request
-
-	//layout  rows
-	std::vector<Row> pendingRows;                   // new layout to apply
-	std::atomic<bool> layoutRequested{ false };     // flag for layout request
-    void applyPendingLayout();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioPluginAudioProcessor)
 };
