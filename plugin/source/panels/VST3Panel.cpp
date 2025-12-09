@@ -77,6 +77,12 @@ void VST3Node::ScannerThread::run()
 
     if (!threadShouldExit()) {
         progress.store(1.0f);
+        
+        // Save to cache
+        auto cacheFile = VST3Node::getPluginCacheFile();
+        if (auto xml = owner.globalPluginList.createXml()) {
+            xml->writeTo(cacheFile);
+        }
     }
     
     // [FIX] Notify owner that scan is complete
@@ -138,11 +144,8 @@ VST3Node::VST3Node(AudioPluginAudioProcessor& proc, const juce::ValueTree& state
     fifo.resize(fftSize);
     fftData.resize(fftSize * 2);
     
-    // Standard init
-    if (!formatManager) {
-        formatManager = std::make_unique<juce::AudioPluginFormatManager>();
-        formatManager->addDefaultFormats();
-    }
+    // Initialize hosting immediately to populate cache before restore runs
+    initializeHosting();
 
     // [FIX] Schedule restore to run after the constructor finishes.
     // We must cast the shared pointer to VST3Node because shared_from_this() 
@@ -347,9 +350,23 @@ VST3Node::~VST3Node() {
 }
 
 void VST3Node::initializeHosting() {
+    // 1. Ensure manager exists
     if (!formatManager) {
         formatManager = std::make_unique<juce::AudioPluginFormatManager>();
         formatManager->addDefaultFormats();
+    }
+
+    // 2. Load cached plugins if the list is empty
+    // This is now independent of formatManager creation
+    std::lock_guard<std::recursive_mutex> lock(pluginListMutex);
+    if (globalPluginList.getNumTypes() == 0) {
+        auto cacheFile = getPluginCacheFile();
+        if (cacheFile.existsAsFile()) {
+            auto xml = juce::parseXML(cacheFile);
+            if (xml) {
+                globalPluginList.recreateFromXml(*xml);
+            }
+        }
     }
 }
 
@@ -853,4 +870,16 @@ void VST3Node::flushStateToValueTree() {
     getMutableNodeState().setProperty("pluginState", 
         state.toBase64Encoding(), 
         &processor.undoManager);
+}
+
+juce::File VST3Node::getPluginCacheFile()
+{
+    auto docsDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory);
+    auto pitchbladeDir = docsDir.getChildFile("Pitchblade");
+    
+    // Ensure the directory exists
+    if (!pitchbladeDir.exists())
+        pitchbladeDir.createDirectory();
+        
+    return pitchbladeDir.getChildFile("VST3Cache.xml");
 }

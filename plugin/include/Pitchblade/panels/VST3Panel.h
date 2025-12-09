@@ -169,5 +169,7 @@ private:
     std::function<void()> pendingScanAction;
     void handleScanFinished();
 
+    static juce::File getPluginCacheFile();
+
     friend class ScannerThread;
 };
