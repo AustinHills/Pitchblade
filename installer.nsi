@@ -1,35 +1,36 @@
 # --- Pitchblade NSIS Installer Script ---
 
-# 1. The name of the installer .exe this script will create
+# 1. Name of the installer executable
 OutFile "Pitchblade_Installer.exe"
 
-# 2. The default installation folder
+# 2. Default installation folder (Standard VST3 path)
 InstallDir "$PROGRAMFILES64\Common Files\VST3"
 
-# 3. Request admin privileges (required for Program Files)
+# 3. Request admin privileges
 RequestExecutionLevel admin
 
-# 4. The "Yes/No" Prompt
-# This function runs first when the .exe is opened
-Function .onInit
-    # Show a popup box with "Yes" and "No" buttons
-    MessageBox MB_YESNO|MB_ICONQUESTION "Install Pitchblade?" IDYES install
-    
-    # If "No" is clicked, quit the installer
-    Abort
-    
-  # If "Yes" is clicked, jump to this label and continue
-  install:
-FunctionEnd
+# --- NEW: License Configuration ---
+# This reads the text from the LICENSE file you created in the root directory.
+LicenseData "LICENSE"
+LicenseText "Please review the license agreement before installing Pitchblade. You must accept the terms of the GNU GPL v3 to continue."
 
-# 5. The installation logic
-# This is the main (and only) section
+# --- NEW: Wizard Pages ---
+# 1. License Page: Shows the license and requires "I Agree" to continue
+Page license
+
+# 2. Installation Page: Shows the progress bar while copying files
+Page instfiles
+
+# --- Installation Logic ---
 Section "Install"
-    # 6. Set the output path to the user's chosen directory
-    SetOutPath "$INSTDIR\Pitchblade"
+    # Set the destination folder to the VST3 directory
+    SetOutPath "$INSTDIR"
     
-    # 7. This is the command that packages your built plugin
-    # It finds the file (relative to this script) and adds it
-    # to the installer .exe.
+    # Copy the VST3 plugin bundle
+    # Note: Ensure "RelWithDebInfo" matches your actual build output folder (e.g., might be "Release")
     File /r "build\plugin\Pitchblade_artefacts\RelWithDebInfo\VST3\Pitchblade.vst3"
+
+    # GOOD PRACTICE: Copy the LICENSE file to the install directory so the user has a copy
+    SetOutPath "$INSTDIR\Pitchblade.vst3\Contents\Resources" 
+    File "LICENSE"
 SectionEnd

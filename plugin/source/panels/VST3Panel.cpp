@@ -238,12 +238,12 @@ VST3Visualizer::VST3Visualizer(AudioPluginAudioProcessor& proc, VST3Node& node)
     : vstNode(node), processor(proc)
 {
     //Time Graph - Austin
-    timeGraph = std::make_unique<RealTimeGraphVisualizer>(proc.apvts, "dB", juce::Range<float>(-100.0f, 0.0f), false, 4);
+    timeGraph = std::make_unique<RealTimeGraphVisualizer>(proc.apvts, "dB", juce::Range<float>(-100.0f, 0.0f), false, 6);
     addChildComponent(timeGraph.get());
     timeGraph->setVisible(true);
 
     //Frequency Graph
-    freqGraph = std::make_unique<FrequencyGraphVisualizer>(proc.apvts, 4, 0);
+    freqGraph = std::make_unique<FrequencyGraphVisualizer>(proc.apvts, 5, 0);
     addChildComponent(freqGraph.get());
     freqGraph->setVisible(false);
 
