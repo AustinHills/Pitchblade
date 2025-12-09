@@ -12,6 +12,7 @@
 #include "Pitchblade/panels/EqualizerPanel.h"
 //hayley
 #include "Pitchblade/panels/PitchPanel.h"
+#include "Pitchblade/panels/AdaptiveDeNoiserPanel.h"
 
 #include "Pitchblade/panels/VST3Panel.h"
 
@@ -205,6 +206,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::c
         "DENOISER_REDUCTION", "DeNoiser Reduction", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.0f));
     params.push_back(std::make_unique<juce::AudioParameterBool>(
         "DENOISER_LEARN", "DeNoiser Learn", false));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "DENOISER_THRESHOLD", "DeNoiser Threshold", juce::NormalisableRange<float>(-100.0f, 0.0f, 0.1f), -100.0f));
 
 	// Formant Shifter : huda
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
@@ -529,6 +532,7 @@ std::shared_ptr<EffectNode> AudioPluginAudioProcessor::createNodeFromState(const
     else if (type == "CompressorNode")  node = std::make_shared<CompressorNode>(*this, state);
     else if (type == "DeEsserNode")     node = std::make_shared<DeEsserNode>(*this, state);
     else if (type == "DeNoiserNode")    node = std::make_shared<DeNoiserNode>(*this, state);
+    else if (type == "AdaptiveDeNoiserNode")    node = std::make_shared<AdaptiveDeNoiserNode>(*this, state);
     else if (type == "EqualizerNode")   node = std::make_shared<EqualizerNode>(*this, state);  
     else if (type == "PitchNode")       node = std::make_shared<PitchNode>(*this, state);
     else if (type == "FormantNode")     node = std::make_shared<FormantNode>(*this, state);

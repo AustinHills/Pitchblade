@@ -85,6 +85,7 @@ target_sources(${PROJECT_NAME}
         source/panels/SettingsPanel.cpp
         source/panels/EqualizerPanel.cpp
         source/panels/VST3Panel.cpp
+        source/panels/AdaptiveDeNoiserPanel.cpp
 
         source/effects/GainProcessor.cpp
         source/effects/NoiseGateProcessor.cpp
@@ -97,6 +98,7 @@ target_sources(${PROJECT_NAME}
         source/effects/DeEsserProcessor.cpp
         source/effects/DeNoiserProcessor.cpp
         source/effects/Equalizer.cpp
+        source/effects/AdaptiveDeNoiserProcessor.cpp
 
 )
 
