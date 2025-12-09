@@ -40,17 +40,22 @@ private:
 };
 
 //Visualizer that switches between Time and Frequency domain
-class VST3Visualizer : public juce::Component, private juce::Timer
+class VST3Visualizer : public juce::Component, private juce::Timer, public juce::AudioProcessorValueTreeState::Listener
 {
 public:
     VST3Visualizer(AudioPluginAudioProcessor& proc, VST3Node& node);
+    ~VST3Visualizer() override;
     void resized() override;
     
     //Called at framerate interval
     void timerCallback() override;
 
+    // APVTS Listener Callback
+    void parameterChanged(const juce::String& parameterID, float newValue) override;
+
 private:
     VST3Node& vstNode;
+    AudioPluginAudioProcessor& processor;
 
     //Visualizers
     std::unique_ptr<RealTimeGraphVisualizer> timeGraph;
@@ -61,6 +66,8 @@ private:
     
     //Helper to build frequency data for the graph
     void updateFrequencyData();
+
+    void updateFramerate(float paramValue);
 };
 
 //The main DSP node that hosts the VST3 plugin

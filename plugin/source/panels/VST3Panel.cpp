@@ -232,7 +232,7 @@ void VST3Panel::timerCallback() {
 
 //VST3 Visualizer Implementation
 VST3Visualizer::VST3Visualizer(AudioPluginAudioProcessor& proc, VST3Node& node)
-    : vstNode(node)
+    : vstNode(node), processor(proc)
 {
     //Time Graph - Austin
     timeGraph = std::make_unique<RealTimeGraphVisualizer>(proc.apvts, "dB", juce::Range<float>(-100.0f, 0.0f), false, 4);
@@ -251,7 +251,49 @@ VST3Visualizer::VST3Visualizer(AudioPluginAudioProcessor& proc, VST3Node& node)
         timeGraph->setVisible(!showFreq);
         freqGraph->setVisible(showFreq);
     };
-    startTimerHz(30);
+    
+    //Add Listener
+    processor.apvts.addParameterListener("GLOBAL_FRAMERATE", this);
+
+    //Initial Update
+    if (auto* param = processor.apvts.getParameter("GLOBAL_FRAMERATE")) {
+        updateFramerate(param->getValue());
+    }
+    float val = *processor.apvts.getRawParameterValue("GLOBAL_FRAMERATE");
+    updateFramerate(val);
+}
+
+VST3Visualizer::~VST3Visualizer() {
+    processor.apvts.removeParameterListener("GLOBAL_FRAMERATE", this);
+    stopTimer();
+}
+
+void VST3Visualizer::parameterChanged(const juce::String& parameterID, float newValue) {
+    if (parameterID == "GLOBAL_FRAMERATE") {
+        // Ensure UI updates (timer changes) happen on the Message Thread
+        juce::MessageManager::callAsync([this, newValue]() {
+            juce::Component::SafePointer<VST3Visualizer> safe(this);
+            if (safe) {
+                safe->updateFramerate(newValue);
+            }
+        });
+    }
+}
+
+void VST3Visualizer::updateFramerate(float paramValue) {
+    // Map 1-4 to FPS
+    int index = (int)paramValue;
+    int fps = 30;
+    
+    switch(index) {
+        case 1: fps = 5;  break;
+        case 2: fps = 15; break;
+        case 3: fps = 30; break;
+        case 4: fps = 60; break;
+        default: fps = 30; break;
+    }
+
+    startTimerHz(fps);
 }
 
 void VST3Visualizer::resized() {
