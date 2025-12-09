@@ -69,11 +69,15 @@ DaisyChain::DaisyChain(AudioPluginAudioProcessor& proc, std::vector<std::shared_
     addAndMakeVisible(addButton);
     addAndMakeVisible(duplicateButton);
     addAndMakeVisible(deleteButton);
+    addAndMakeVisible(undoButton);
+    addAndMakeVisible(redoButton);
 
     //tooltip conection
     addButton.getProperties().set("tooltipKey", "addButton");
     duplicateButton.getProperties().set("tooltipKey", "duplicateButton");
     deleteButton.getProperties().set("tooltipKey", "deleteButton");
+    undoButton.getProperties().set("tooltipKey", "undoButton");
+    redoButton.getProperties().set("tooltipKey", "redoButton");
 
 	// scroll area for effects
     addAndMakeVisible(scrollArea);
@@ -82,6 +86,8 @@ DaisyChain::DaisyChain(AudioPluginAudioProcessor& proc, std::vector<std::shared_
     addButton.onClick = [this]() { showAddMenu(); };
     duplicateButton.onClick = [this]() { showDuplicateMenu(); };
     deleteButton.onClick = [this]() { showDeleteMenu(); };
+    undoButton.onClick = [this] { processorRef.undoManager.undo(); };
+    redoButton.onClick = [this] { processorRef.undoManager.redo(); };
 
     // Attach to the Chain value tree
     auto chain = processorRef.apvts.state.getChildWithName("Chain");
@@ -296,6 +302,15 @@ void DaisyChain::resized() {
     deleteButton.setBounds(rightEdge - buttonWidth, topBar.getY() + 4, buttonWidth, topBar.getHeight() - 8);
     duplicateButton.setBounds(deleteButton.getX() - buttonWidth - spacing, deleteButton.getY(), buttonWidth, deleteButton.getHeight());
     addButton.setBounds(duplicateButton.getX() - buttonWidth - spacing, duplicateButton.getY(), buttonWidth, duplicateButton.getHeight());
+
+    area.removeFromBottom(4);
+    auto bottomBar = area.removeFromBottom(24); 
+    
+    int availWidth = bottomBar.getWidth(); 
+    int undoWidth = (availWidth - spacing) / 2;
+    
+    undoButton.setBounds(bottomBar.getX(), bottomBar.getY(), undoWidth, bottomBar.getHeight());
+    redoButton.setBounds(bottomBar.getX() + undoWidth + spacing, bottomBar.getY(), undoWidth, bottomBar.getHeight());
 
     // scrollable list area
     auto scrollBounds = area;

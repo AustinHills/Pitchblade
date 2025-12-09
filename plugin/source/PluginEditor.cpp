@@ -276,14 +276,6 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
 
     //For undo manager
     setWantsKeyboardFocus(true);
-
-    // Connect Undo/Redo buttons
-    topBar.undoButton.onClick = [this] { 
-        processorRef.undoManager.undo(); 
-    };
-    topBar.redoButton.onClick = [this] { 
-        processorRef.undoManager.redo(); 
-    };
 }
 
 void AudioPluginAudioProcessorEditor::rebuildAndSyncUI() {
