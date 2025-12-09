@@ -36,6 +36,32 @@ SettingsPanel::SettingsPanel(AudioPluginAudioProcessor& p) : processor(p) {
                 holder->showAudioSettingsDialog();
         #endif
     };
+
+    //License stuff
+    addAndMakeVisible(licenseText);
+    licenseText.setMultiLine(true);
+    licenseText.setReadOnly(true);
+    licenseText.setScrollbarsShown(true);
+    licenseText.setCaretVisible(false);
+    
+    // Style the text to look like a label but scrollable
+    licenseText.setColour(juce::TextEditor::backgroundColourId, juce::Colours::transparentBlack);
+    licenseText.setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
+    licenseText.setColour(juce::TextEditor::textColourId, Colors::buttonText.withAlpha(0.8f));
+
+    juce::String msg;
+    msg << "PITCHBLADE\n";
+    msg << "Copyright (c) 2025 WSU Pitchblade Team\n";
+    msg << "Licensed under GNU GPL v3\n\n";
+    msg << "CREDITS:\n";
+    msg << "- Pitch Shifting: Rubber Band Library (GPL)\n";
+    msg << "  (c) Particular Programs Ltd\n";
+    msg << "- Framework: JUCE (GPL)\n";
+    msg << "  (c) Raw Material Software\n";
+    msg << "- VST is a registered trademark of\n";
+    msg << "  Steinberg Media Technologies GmbH";
+
+    licenseText.setText(msg);
 }
 
 SettingsPanel::~SettingsPanel(){}
@@ -83,4 +109,7 @@ void SettingsPanel::resized(){
     framerateLabel.setBounds(framerateArea.removeFromLeft(framerateArea.getWidth()/3));
     framerateArea.removeFromLeft(10);
     framerateDropDown.setBounds(framerateArea);
+
+    // License text takes up some bottom room
+    licenseText.setBounds(area.removeFromBottom(100));
 }

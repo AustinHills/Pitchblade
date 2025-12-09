@@ -28,6 +28,9 @@ private:
 
     juce::TextButton audioSettingsButton { "Audio Settings" };
 
+    //TextEditor to hold the license info
+    juce::TextEditor licenseText;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SettingsPanel)
 public:
     //Constructor
