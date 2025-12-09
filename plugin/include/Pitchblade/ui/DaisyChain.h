@@ -52,6 +52,10 @@ public:
     juce::TextButton duplicateButton{ "Copy" };
     juce::TextButton deleteButton{ "Del" };
 
+    //Undo/Redo buttons
+    juce::TextButton undoButton{ "Undo" };
+    juce::TextButton redoButton{ "Redo" };
+
 	// menus for add/duplicate/delete
     void showAddMenu();
     void showDuplicateMenu();

@@ -20,16 +20,12 @@ TopBar::TopBar() {
     addAndMakeVisible(bypassButton);
     addAndMakeVisible(presetButton);
     addAndMakeVisible(lockBypassButton);
-    addAndMakeVisible(undoButton);
-    addAndMakeVisible(redoButton);
 
     //tooltip connection
     presetButton.getProperties().set("tooltipKey", "presetButton");
     settingsButton.getProperties().set("tooltipKey", "settingsButton");
     bypassButton.getProperties().set("tooltipKey", "bypassButton");
     lockBypassButton.getProperties().set("tooltipKey", "lockBypassButton");
-    undoButton.getProperties().set("tooltipKey", "undoButton");
-    redoButton.getProperties().set("tooltipKey", "redoButton");
 
 }
 
@@ -60,8 +56,6 @@ void TopBar::resized() {
     settingsButton.setBounds(area.removeFromRight(80));
     presetButton.setBounds(area.removeFromRight(80));
     bypassButton.setBounds(area.removeFromRight(80));
-    redoButton.setBounds(area.removeFromRight(60));
-    undoButton.setBounds(area.removeFromRight(60));
     
 }
 

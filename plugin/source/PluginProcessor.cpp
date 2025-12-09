@@ -129,17 +129,21 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
 
     std::set_terminate(TerminateHandler);
 
-    #if JUCE_WINDOWS
-        // Register Vectored Handler as FIRST PRIORITY (1)
-        // This overrides any VST3 plugin's attempt to hide the crash.
-        AddVectoredExceptionHandler(1, VectoredCrashHandler);
-    #endif
+    if (juce::JUCEApplication::isStandaloneApp()) 
+    {
+        // Windows Vectored Handler
+        #if JUCE_WINDOWS
+            AddVectoredExceptionHandler(1, VectoredCrashHandler);
+        #endif
 
-    signal(SIGABRT, StandardSignalHandler);
-    signal(SIGFPE,  StandardSignalHandler);
-    #if !JUCE_WINDOWS
-        signal(SIGSEGV, StandardSignalHandler);
-    #endif
+        // Standard Signals
+        std::set_terminate(TerminateHandler);
+        signal(SIGABRT, StandardSignalHandler);
+        signal(SIGFPE,  StandardSignalHandler);
+        #if !JUCE_WINDOWS
+            signal(SIGSEGV, StandardSignalHandler);
+        #endif
+    }
 
 	    // check if effectNodes tree exists
     if (!apvts.state.getChildWithName("Chain").isValid()) {
