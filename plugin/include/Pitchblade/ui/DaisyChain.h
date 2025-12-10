@@ -101,6 +101,9 @@ public:
 	std::shared_ptr<EffectNode> findNodeByName(const juce::String& name) const; // helper to find node by name
     std::vector<std::shared_ptr<EffectNode>>& effectNodes;                      // refern to processor's chain
 
+    //Helper to show context menu for specific node
+    void showContextMenu(int index, bool isRightSide);
+
 private:
 	juce::Viewport scrollArea;          // scroll area for daisy chain
 	juce::Component effectsContainer;   // container for effect items

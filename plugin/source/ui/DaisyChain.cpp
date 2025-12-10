@@ -196,9 +196,14 @@ void DaisyChain::rebuild() {
             };
         } else {
             // Start New Row
-            currentRow = new DaisyChainItem(node->effectName, i);
+            currentRow = new DaisyChainItem(node->effectName, items.size());
             effectsContainer.addAndMakeVisible(currentRow);
             items.add(currentRow);
+
+            //Connect context menu
+            currentRow->onContextMenu = [this](int idx, bool right) {
+                showContextMenu(idx, right);
+            };
             
             currentRow->updateBypassVisual(node->bypassed);
             
@@ -227,7 +232,7 @@ void DaisyChain::handleReorder(int kind, const juce::String& dragName, int targe
 
     auto chain = processorRef.apvts.state.getChildWithName("Chain");
     
-    // 1. Find index of dragged node
+    // 1. Find index of dragged node in ValueTree
     int oldIndex = -1;
     for (int i = 0; i < chain.getNumChildren(); ++i) {
         if (chain.getChild(i).getProperty("name") == dragName) {
@@ -237,51 +242,104 @@ void DaisyChain::handleReorder(int kind, const juce::String& dragName, int targe
     }
     if (oldIndex == -1) return;
 
-    // 2. Identify Target Index
-    // DaisyChainItem passes the linear index of the node that starts the row.
-    // We can use this directly.
-    int targetIndex = targetRow;
-
-    // Clamp to valid range just in case
-    targetIndex = juce::jlimit(0, chain.getNumChildren(), targetIndex);
-
     processorRef.undoManager.beginNewTransaction();
+
+    // 2. Cleanup Old Neighbors (Fix broken double rows before move)
+    // If we move a node, its previous partner (if any) becomes an orphan.
+    {
+        auto draggedNode = chain.getChild(oldIndex);
+        int currentMode = (int)draggedNode.getProperty("chainMode");
+        
+        // If we are moving the LEFT side of a double row, fix the RIGHT side
+        if (currentMode == 5 /*LeftDouble*/) {
+            if (oldIndex + 1 < chain.getNumChildren()) {
+                auto rightPartner = chain.getChild(oldIndex + 1);
+                if ((int)rightPartner.getProperty("chainMode") == 3 /*DoubleDown*/) {
+                    rightPartner.setProperty("chainMode", 1, &processorRef.undoManager);
+                }
+            }
+        }
+        // If we are moving the RIGHT side of a double row, fix the LEFT side
+        else if (currentMode == 3 /*DoubleDown*/) {
+            if (oldIndex - 1 >= 0) {
+                auto leftPartner = chain.getChild(oldIndex - 1);
+                if ((int)leftPartner.getProperty("chainMode") == 5 /*LeftDouble*/) {
+                    leftPartner.setProperty("chainMode", 1, &processorRef.undoManager);
+                }
+            }
+        }
+    }
 
     if (kind == -2) {
         // === Drop to RIGHT (Make Parallel) ===
-        // User dropped onto the right handle of the node at 'targetIndex'.
-        // We want to insert strictly AFTER this node.
+        // 1. Find the ValueTree index of the node we are dropping ONTO
+        int targetVTIndex = -1;
+        if (targetRow < items.size()) {
+            DaisyChainItem* targetItem = items[targetRow];
+            juce::String name = targetItem->getName();
+            for (int i = 0; i < chain.getNumChildren(); ++i) {
+                if (chain.getChild(i).getProperty("name") == name) {
+                    targetVTIndex = i;
+                    break;
+                }
+            }
+        }
         
-        auto draggedNode = chain.getChild(oldIndex);
-        draggedNode.setProperty("chainMode", 3, &processorRef.undoManager); // 3 = DoubleDown / Right Side
+        if (targetVTIndex == -1) return; // Should not happen for side-drop
 
-        // Calculate insertion point (Always index + 1 for "Right Side")
-        int insertIndex = targetIndex + 1;
+        auto draggedNode = chain.getChild(oldIndex);
         
-        // Adjust if dragging from above the target (shift down)
-        // If oldIndex is 0 and we want to insert at 2 (which becomes 1).
+        // Set the Target (Left) node to LeftDouble
+        auto targetNode = chain.getChild(targetVTIndex);
+        targetNode.setProperty("chainMode", 5 /*LeftDouble*/, &processorRef.undoManager);
+
+        // Set Dragged (Right) node to DoubleDown
+        draggedNode.setProperty("chainMode", 3 /*DoubleDown*/, &processorRef.undoManager);
+
+        // Insert Index is strictly After the target
+        int insertIndex = targetVTIndex + 1;
+        
+        // FIX: Off-by-one check for moveChild
         if (oldIndex < insertIndex) insertIndex--;
 
         chain.moveChild(oldIndex, insertIndex, &processorRef.undoManager);
     } 
     else {
         // === Drop Insert (Vertical) ===
-        // User dropped Above or Below a row.
-        // targetIndex represents the desired slot.
         
+        // 1. Convert UI Row to ValueTree Index
+        int targetVTIndex = -1;
+        
+        if (targetRow >= items.size()) {
+             // Append to end
+             targetVTIndex = chain.getNumChildren();
+        } else {
+             // Insert BEFORE the node at targetRow
+             DaisyChainItem* targetItem = items[targetRow];
+             juce::String name = targetItem->getName();
+             
+             for (int i = 0; i < chain.getNumChildren(); ++i) {
+                if (chain.getChild(i).getProperty("name") == name) {
+                    targetVTIndex = i;
+                    break;
+                }
+             }
+             if (targetVTIndex == -1) targetVTIndex = chain.getNumChildren();
+        }
+
         auto draggedNode = chain.getChild(oldIndex);
         
-        // Reset mode to Down (1). 
-        // Note: Logic in syncChainFromState will automatically upgrade this to 
-        // Split/Unite/LeftDouble based on context later.
+        // Reset mode to Down (1) to ensure it doesn't try to be a double row
         draggedNode.setProperty("chainMode", 1, &processorRef.undoManager); 
 
-        // moveChild handles the index shift logic internally for the move itself,
-        // we just provide the destination index in the current list state?
-        // Actually JUCE moveChild behavior: "The new index that the child should be moved to."
-        // If we move 0 to 3: 0 is removed, remaining shift, inserted at 3.
+        // FIX: Off-by-one check for moveChild
+        // When moving an item down the list, we must decrement the target index
+        // because removing the item at 'oldIndex' shifts subsequent items up.
+        if (oldIndex < targetVTIndex) {
+            targetVTIndex--;
+        }
         
-        chain.moveChild(oldIndex, targetIndex, &processorRef.undoManager);
+        chain.moveChild(oldIndex, targetVTIndex, &processorRef.undoManager);
     }
 
     processorRef.undoManager.beginNewTransaction();
@@ -806,4 +864,148 @@ void DaisyChain::valueTreePropertyChanged(juce::ValueTree& tree, const juce::Ide
     if (property.toString() == "name") {
         juce::MessageManager::callAsync([this]() { rebuild(); });
     }
+}
+
+//Context menu handler
+void DaisyChain::showContextMenu(int index, bool isRightSide) {
+    if (reorderLocked) return;
+
+    // 1. Find the target row item
+    DaisyChainItem* row = getItem(index);
+    if (!row) return;
+
+    // 2. Determine effect name based on side
+    juce::String effectName = isRightSide ? row->rightEffectName : row->getName();
+    
+    // 3. Find the actual EffectNode
+    auto node = findNodeByName(effectName);
+    if (!node) return;
+
+    // 4. Build Menu
+    juce::PopupMenu menu;
+    menu.setLookAndFeel(&getLookAndFeel());
+
+    // -- Bypass --
+    menu.addItem("Bypass", true, node->bypassed, [this, node, row, isRightSide]() {
+        node->bypassed = !node->bypassed;
+        
+        if (isRightSide) row->updateSecondaryBypassVisual(node->bypassed);
+        else             row->updateBypassVisual(node->bypassed);
+
+        if (onAnyBypassChanged) onAnyBypassChanged();
+    });
+
+    menu.addSeparator();
+
+    // -- Duplicate --
+    // Check constraints for single-instance effects
+    bool canDuplicate = true;
+    if (node->effectName.startsWith("Formant") && hasFormant()) canDuplicate = false;
+    if (node->effectName.startsWith("Pitch") && hasPitch()) canDuplicate = false;
+
+    menu.addItem("Duplicate", canDuplicate, false, [this, node]() {
+        juce::ValueTree originalState = node->getNodeStateConst();
+        juce::ValueTree newState = originalState.createCopy();
+        newState.setProperty("uuid", juce::Uuid().toString(), nullptr);
+        
+        // Generate unique name
+        juce::String currentName = originalState.getProperty("name").toString();
+        juce::String newName = makeUniqueName(currentName, effectNodes);
+        newState.setProperty("name", newName, nullptr);
+
+        auto chain = processorRef.apvts.state.getChildWithName("Chain");
+        chain.addChild(newState, -1, &processorRef.undoManager);
+        processorRef.undoManager.beginNewTransaction();
+    });
+
+    // -- Reset to Default --
+    // Implemented by removing current and adding a fresh one of same type
+    menu.addItem("Reset to Default", [this, node]() {
+        juce::String type = node->getNodeStateConst().getType().toString();
+        juce::String name = node->effectName; 
+        
+        // Correctly parse base name by removing trailing numbers only
+        juce::String baseName = name.trim();
+        int lastSpace = baseName.lastIndexOfChar(' ');
+        if (lastSpace > 0) {
+            juce::String suffix = baseName.substring(lastSpace + 1);
+            if (suffix.containsOnly("0123456789")) {
+                baseName = baseName.substring(0, lastSpace);
+            }
+        }
+        // If no number found, baseName remains equal to name (e.g. "Noise Gate")
+
+        auto chain = processorRef.apvts.state.getChildWithName("Chain");
+        
+        // Find index in ValueTree
+        int vtIndex = -1;
+        for(int i=0; i<chain.getNumChildren(); ++i) {
+            if(chain.getChild(i).getProperty("name") == node->effectName) {
+                vtIndex = i;
+                break;
+            }
+        }
+        
+        if (vtIndex >= 0) {
+            processorRef.undoManager.beginNewTransaction();
+
+            // Remove old
+            chain.removeChild(vtIndex, &processorRef.undoManager);
+            
+            // Create fresh
+            juce::ValueTree newNode(type);
+            juce::String newName = makeUniqueName(baseName, effectNodes);
+            newNode.setProperty("name", newName, nullptr);
+            newNode.setProperty("uuid", juce::Uuid().toString(), nullptr);
+            
+            // Insert at same location
+            chain.addChild(newNode, vtIndex, &processorRef.undoManager);
+            processorRef.undoManager.beginNewTransaction();
+        }
+    });
+
+    menu.addSeparator();
+
+    // -- Delete --
+    menu.addItem("Delete", [this, node]() {
+        auto chain = processorRef.apvts.state.getChildWithName("Chain");
+        
+        // Find index
+        int vtIndex = -1;
+        for(int i=0; i<chain.getNumChildren(); ++i) {
+            if(chain.getChild(i).getProperty("name") == node->effectName) {
+                vtIndex = i;
+                break;
+            }
+        }
+
+        if (vtIndex >= 0) {
+            auto child = chain.getChild(vtIndex);
+            
+            // Handle Double Row Logic (Prevent merging bugs)
+            if (node->chainMode == ChainMode::LeftDouble) {
+                 if (vtIndex + 1 < effectNodes.size()) {
+                     auto nextNode = effectNodes[vtIndex + 1];
+                     if (nextNode->chainMode == ChainMode::DoubleDown) {
+                         auto nextChild = chain.getChild(vtIndex + 1);
+                         nextChild.setProperty("chainMode", 1, &processorRef.undoManager);
+                     }
+                 }
+            }
+            else if (node->chainMode == ChainMode::DoubleDown) {
+                if (vtIndex - 1 >= 0) {
+                    auto prevNode = effectNodes[vtIndex - 1];
+                    if (prevNode->chainMode == ChainMode::LeftDouble) {
+                         auto prevChild = chain.getChild(vtIndex - 1);
+                         prevChild.setProperty("chainMode", 1, &processorRef.undoManager);
+                    }
+                }
+            }
+            
+            chain.removeChild(child, &processorRef.undoManager);
+            processorRef.undoManager.beginNewTransaction();
+        }
+    });
+
+    menu.showMenuAsync(juce::PopupMenu::Options());
 }

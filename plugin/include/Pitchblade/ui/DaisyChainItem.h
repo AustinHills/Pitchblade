@@ -46,6 +46,8 @@ public:
 		button.setButtonText(effectName);
 		addAndMakeVisible(button);
 
+        button.addMouseListener(this,false);
+
 		// make buttons transparent
         button.setOpaque(false);
         rightButton.setOpaque(false);
@@ -194,6 +196,22 @@ public:
 	// drag and drop /////////////////////////////////
 
     void mouseDown(const juce::MouseEvent& e) override {
+        //Right click context menu detection
+        if (e.mods.isPopupMenu()) {
+            bool isRightSide = false;
+            
+            // Check if clicked the right button directly, or the right half of the row
+            if (e.eventComponent == &rightButton) {
+                isRightSide = true;
+            } 
+            else if (hasRight && e.getPosition().getX() > getWidth() / 2) {
+                isRightSide = true;
+            }
+
+            if (onContextMenu) onContextMenu(myIndex, isRightSide);
+            return;
+        }
+        
         //  check if parent DaisyChain is locked
         if (auto* parent = getParentComponent()) {
             // climb up component tree until it finds DaisyChain
@@ -209,9 +227,15 @@ public:
             }
         }
         if (e.mods.isLeftButtonDown()) {
-            if (auto* container = juce::DragAndDropContainer::findParentDragContainerFor(this)) {
-                auto snapshot = createComponentSnapshot(getLocalBounds());
-                container->startDragging(getName(), this, snapshot, true);
+            // Only start dragging if the user clicked one of the grips.
+            // This allows button clicks (which bubble up to this listener) to pass through.
+            if (e.eventComponent == &grip || e.eventComponent == &rightGrip) {
+                if (auto* container = juce::DragAndDropContainer::findParentDragContainerFor(this)) {
+                    juce::String dragName = (e.eventComponent == &rightGrip) ? rightEffectName : getName();
+                    
+                    auto snapshot = createComponentSnapshot(getLocalBounds());
+                    container->startDragging(dragName, this, snapshot, true);
+                }
             }
         }
     }
@@ -319,6 +343,9 @@ public:
         rightButton.setButtonText(effectName);
         rightButton.setVisible(true);
 
+        //Listen for right button clicks
+        rightButton.addMouseListener(this,false);
+
         rightMode.setButtonText(chaingID(/*DoubleDown*/ 3));
         rightMode.setEnabled(false);
         rightMode.setVisible(true);
@@ -384,6 +411,9 @@ public:
     std::function<void(int, bool)> onBypassChanged;     //row index, bypass
 	std::function<void(int, int)> onModeChanged;        //row index, mode id
     std::function<void(int, bool)> onSecondaryBypassChanged;
+
+    //Callback for right click context menu
+    std::function<void(int, bool)> onContextMenu;
 
 	juce::String rightEffectName;   // name of right effect if double
 
