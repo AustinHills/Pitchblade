@@ -19,6 +19,8 @@
 #include <csignal>
 #include <exception>
 
+#include <chrono>
+
 #if JUCE_WINDOWS
  #include <windows.h>
  #include <dbghelp.h>
@@ -392,6 +394,9 @@ void AudioPluginAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
                 e->rebuildAndSyncUI();
         });
     }
+
+    // Reset the load measurer
+    loadMeasurer.reset(sampleRate, samplesPerBlock);
 }
 
 void AudioPluginAudioProcessor::releaseResources() {
@@ -429,6 +434,12 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, 
     juce::ignoreUnused (midiMessages);
     juce::ScopedNoDenormals noDenormals;
 
+    // Start measuring time for this block
+    auto startTime = std::chrono::high_resolution_clock::now();
+    
+    // This JUCE helper automatically calculates the % load for us
+    juce::AudioProcessLoadMeasurer::ScopedTimer loadTimer(loadMeasurer);
+
 	// process audio through daisy chain - reyna
     if (!isBypassed() && activeNodes && !activeNodes->empty()) {
 		auto chain = activeNodes;   // copy shared
@@ -436,10 +447,22 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, 
         if (root) root->processAndForward(*this, buffer);
     } 
 
+    // Stop measuring time
+    auto endTime = std::chrono::high_resolution_clock::now();
+    
+    // Calculate duration in milliseconds
+    std::chrono::duration<float, std::milli> duration = endTime - startTime;
+    
+    // Update the atomic variables (UI will read these)
+    processTimeMs.store(duration.count());
+    cpuLoad.store(loadMeasurer.getLoadAsProportion());
+
     //juce boilerplate
     for (auto i = getTotalNumInputChannels(); i < getTotalNumOutputChannels(); ++i) {
         buffer.clear(i, 0, buffer.getNumSamples());
     }
+
+    
 }
 
 //==============================================================================

@@ -276,6 +276,8 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
 
     //For undo manager
     setWantsKeyboardFocus(true);
+
+    startTimerHz(30); //update cpu stats 30 times a second
 }
 
 void AudioPluginAudioProcessorEditor::rebuildAndSyncUI() {
@@ -762,4 +764,10 @@ void AudioPluginAudioProcessorEditor::parentHierarchyChanged()
             window->setUsingNativeTitleBar(true);
         }
     }
+}
+
+void AudioPluginAudioProcessorEditor::timerCallback()
+{
+    // Pass data from Processor -> TopBar
+    topBar.updateCpuStats(processorRef.getCpuLoad(), processorRef.getProcessTimeMs());
 }

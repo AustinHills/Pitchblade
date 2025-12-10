@@ -27,6 +27,8 @@
 #include "Pitchblade/effects/PitchCorrector.h"      
 //reyna
 #include "Pitchblade/panels/EffectNode.h"           
+
+#include <atomic>
 class EffectNode;   // forward declaration for effectNode order 
 
 //==============================================================================
@@ -128,6 +130,10 @@ public:
 
     void triggerUIRebuild();
 
+    // Getters for the UI to read
+    float getCpuLoad() const { return cpuLoad.load(); }
+    float getProcessTimeMs() const { return processTimeMs.load(); }
+
 private:
     //============================================================================== 
     //processors
@@ -164,6 +170,13 @@ private:
     //reorder queue
 	std::recursive_mutex audioMutex;                    // mutex for audio thread safety
 	std::atomic<bool> reorderRequested{ false };        // flag for reorder request
+
+    // Thread-safe performance trackers
+    std::atomic<float> cpuLoad { 0.0f };
+    std::atomic<float> processTimeMs { 0.0f };
+    
+    // JUCE helper that smooths out CPU usage calculation
+    juce::AudioProcessLoadMeasurer loadMeasurer;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioPluginAudioProcessor)
 };

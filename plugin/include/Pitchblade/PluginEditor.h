@@ -32,7 +32,8 @@ It also applies the custom Look and Feel for the plugin.
 class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
                                               public juce::DragAndDropContainer,
                                               public juce::Button::Listener,     // Austin -  added this for the settings panel
-	                                          public juce::MouseListener         // reyna - for presets/settings closing on outside click
+	                                          public juce::MouseListener,         // reyna - for presets/settings closing on outside click
+                                              public juce::Timer                 //For CPU usage update
 {
 public:
     explicit AudioPluginAudioProcessorEditor (AudioPluginAudioProcessor&);
@@ -73,6 +74,8 @@ public:
 
     //For fullscreen button
     void parentHierarchyChanged() override;
+
+    void timerCallback();
 
 private:
     // This reference is provided as a quick way for your editor to access the processor object that created it.

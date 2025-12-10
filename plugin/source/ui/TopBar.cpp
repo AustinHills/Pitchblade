@@ -27,6 +27,12 @@ TopBar::TopBar() {
     bypassButton.getProperties().set("tooltipKey", "bypassButton");
     lockBypassButton.getProperties().set("tooltipKey", "lockBypassButton");
 
+    // Setup CPU Label
+    addAndMakeVisible(cpuLabel);
+    cpuLabel.setFont(juce::Font(12.0f, juce::Font::bold));
+    cpuLabel.setColour(juce::Label::textColourId, Colors::accentLight);
+    cpuLabel.setJustificationType(juce::Justification::centredRight);
+
 }
 
 // paint top bar with gradient
@@ -56,7 +62,8 @@ void TopBar::resized() {
     settingsButton.setBounds(area.removeFromRight(80));
     presetButton.setBounds(area.removeFromRight(80));
     bypassButton.setBounds(area.removeFromRight(80));
-    
+
+    cpuLabel.setBounds(area.removeFromLeft(120).reduced(0, 10));
 }
 
 // turn button pink if active
@@ -67,4 +74,16 @@ void TopBar::setButtonActive(juce::TextButton& button, bool active) {
     button.setColour(juce::TextButton::textColourOffId, Colors::buttonText);
     button.setColour(juce::TextButton::textColourOnId, Colors::buttonText);
     button.repaint();
+}
+
+void TopBar::updateCpuStats(float load, float ms) {
+    // Format: "12% | 0.5ms"
+    // We color it RED if it goes above 90%
+    juce::String text = juce::String(load * 100.0f, 1) + "% | " + juce::String(ms, 2) + "ms";
+    cpuLabel.setText(text, juce::dontSendNotification);
+    
+    if (load > 0.9f)
+        cpuLabel.setColour(juce::Label::textColourId, juce::Colours::red);
+    else
+        cpuLabel.setColour(juce::Label::textColourId, Colors::accentLight);
 }
