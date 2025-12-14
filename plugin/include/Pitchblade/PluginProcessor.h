@@ -19,6 +19,7 @@
 #include "Pitchblade/effects/DeEsserProcessor.h"    
 #include "Pitchblade/effects/DeNoiserProcessor.h"   
 #include "Pitchblade/effects/NoiseGateProcessor.h"  
+#include "Pitchblade/effects/SaturationProcessor.h"  
 //huda
 #include "Pitchblade/effects/FormantDetector.h"     
 #include "Pitchblade/effects/FormantShifter.h"      
@@ -89,6 +90,7 @@ public:
     CompressorProcessor& getCompressorProcessor() { return compressorProcessor; }
     DeEsserProcessor& getDeEsserProcessor() { return deEsserProcessor; }
     DeNoiserProcessor& getDeNoiserProcessor() { return deNoiserProcessor; }
+    SaturationProcessor& getSaturationProcessor() { return saturationProcessor; }
 
     int getCurrentBlockSize() const {return currentBlockSize;}; // Austin - Was having an issue initializing de-esser
 
@@ -144,6 +146,7 @@ private:
     CompressorProcessor compressorProcessor; 
     DeEsserProcessor deEsserProcessor;      
     DeNoiserProcessor deNoiserProcessor;  
+    SaturationProcessor saturationProcessor;  
 
     int currentBlockSize = 512;
 

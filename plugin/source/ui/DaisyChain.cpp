@@ -16,6 +16,7 @@
 #include "Pitchblade/panels/PitchPanel.h"
 #include "Pitchblade/panels/EqualizerPanel.h"
 #include "Pitchblade/panels/AdaptiveDeNoiserPanel.h"
+#include "Pitchblade/panels/SaturationPanel.h"
 
 #include "Pitchblade/panels/VST3Panel.h"
 
@@ -663,6 +664,7 @@ void DaisyChain::showAddMenu() {
     menu.addItem(7, "Formant",  !formantExists);    // disable when one already exists
     menu.addItem(8, "Pitch",    !pitchExists);
     menu.addItem(9, "Equalizer");
+    menu.addItem(10, "Saturation");
     menu.addItem(99, "VST3");
 
 	// set look and feel
@@ -687,6 +689,7 @@ void DaisyChain::showAddMenu() {
             case 7: type="FormantNode"; baseName="Formant"; break;
             case 8: type="PitchNode"; baseName="Pitch"; break;
             case 9: type="EqualizerNode"; baseName="Equalizer"; break;
+            case 10: type="SaturationNode"; baseName="Saturation"; break;
             case 99: type="VST3Node"; baseName="VST3"; break;
         }
 
