@@ -10,6 +10,7 @@
 #include "Pitchblade/panels/GainPanel.h"
 #include "Pitchblade/panels/NoiseGatePanel.h"
 #include "Pitchblade/panels/CompressorPanel.h"
+#include "Pitchblade/panels/BandPassCompressorPanel.h"
 #include "Pitchblade/panels/DeEsserPanel.h"
 #include "Pitchblade/panels/DeNoiserPanel.h"
 #include "Pitchblade/panels/FormantPanel.h"
@@ -676,13 +677,14 @@ void DaisyChain::showAddMenu() {
     menu.addItem(1, "Gain");
     menu.addItem(2, "Noise Gate");
     menu.addItem(3, "Compressor");
-    menu.addItem(4, "De-Esser");
-    menu.addItem(5, "De-Noiser");
-    menu.addItem(6, "Adaptive De-Noiser");
-    menu.addItem(7, "Formant",  !formantExists);    // disable when one already exists
-    menu.addItem(8, "Pitch",    !pitchExists);
-    menu.addItem(9, "Equalizer");
-    menu.addItem(10, "Saturation");
+    menu.addItem(4, "Band-Pass Compressor");
+    menu.addItem(5, "De-Esser");
+    menu.addItem(6, "De-Noiser");
+    menu.addItem(7, "Adaptive De-Noiser");
+    menu.addItem(8, "Formant",  !formantExists);    // disable when one already exists
+    menu.addItem(9, "Pitch",    !pitchExists);
+    menu.addItem(10, "Equalizer");
+    menu.addItem(11, "Saturation");
     menu.addItem(99, "VST3");
 
 	// set look and feel
@@ -701,13 +703,14 @@ void DaisyChain::showAddMenu() {
             case 1: type="GainNode"; baseName="Gain"; break;
             case 2: type="NoiseGateNode"; baseName="Noise Gate"; break;
             case 3: type="CompressorNode"; baseName="Compressor"; break;
-            case 4: type="DeEsserNode"; baseName="De-Esser"; break;
-            case 5: type="DeNoiserNode"; baseName="De-Noiser"; break;
-            case 6: type="AdaptiveDeNoiserNode"; baseName="Adaptive De-Noiser"; break;
-            case 7: type="FormantNode"; baseName="Formant"; break;
-            case 8: type="PitchNode"; baseName="Pitch"; break;
-            case 9: type="EqualizerNode"; baseName="Equalizer"; break;
-            case 10: type="SaturationNode"; baseName="Saturation"; break;
+            case 4: type="BandPassCompressorNode"; baseName="Band-Pass Compressor"; break;
+            case 5: type="DeEsserNode"; baseName="De-Esser"; break;
+            case 6: type="DeNoiserNode"; baseName="De-Noiser"; break;
+            case 7: type="AdaptiveDeNoiserNode"; baseName="Adaptive De-Noiser"; break;
+            case 8: type="FormantNode"; baseName="Formant"; break;
+            case 9: type="PitchNode"; baseName="Pitch"; break;
+            case 10: type="EqualizerNode"; baseName="Equalizer"; break;
+            case 11: type="SaturationNode"; baseName="Saturation"; break;
             case 99: type="VST3Node"; baseName="VST3"; break;
         }
 
