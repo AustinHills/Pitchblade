@@ -493,7 +493,15 @@ void AudioPluginAudioProcessor::setStateInformation (const void* data, int sizeI
 	// parse XML from binary blob
     std::unique_ptr<juce::XmlElement> xml(getXmlFromBinary(data, sizeInBytes));
     if (xml) {
-        apvts.replaceState(juce::ValueTree::fromXml(*xml));
+        if (xml->hasTagName(apvts.state.getType())) {
+            apvts.replaceState(juce::ValueTree::fromXml(*xml));
+            
+            // Re-attach listener as the underlying ValueTree object has changed
+            apvts.state.addListener(this);
+            
+            // Force sync to ensure effectNodes match the loaded state
+            syncChainFromState();
+        }
     }
 }
 

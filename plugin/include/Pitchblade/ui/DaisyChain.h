@@ -42,7 +42,7 @@ public:
     };
 
     // helper accessors
-    const std::vector<Row>& getCurrentLayout() const;  // new layout model
+    // const std::vector<Row>& getCurrentLayout() const;  // removed as unused/unimplemented
     std::vector<juce::String> getCurrentOrder() const;                  // flatten rows for old API
 
 	juce::OwnedArray<DaisyChainItem> items; // ui rows
@@ -74,8 +74,6 @@ public:
 
     // notify editor when any bypass state changes
     std::function<void()> onAnyBypassChanged;
-
-    void resetRowsToNodes(); // force rows to mirror processor/effectNodes for loading presets
 
     int getNumItems() const { return items.size(); }    // get number of items
 

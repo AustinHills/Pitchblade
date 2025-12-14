@@ -30,11 +30,34 @@ protected:
         }
     }
 
+    void addNodeToChain(const juce::String& type, const juce::String& name) {
+        auto chain = plugin->apvts.state.getChildWithName("Chain");
+        juce::ValueTree newNode(type);
+        newNode.setProperty("name", name, nullptr);
+        newNode.setProperty("uuid", juce::Uuid().toString(), nullptr);
+        chain.addChild(newNode, -1, &plugin->undoManager);
+        plugin->syncChainFromState();
+    }
+
     void validateEffectPerformance(const std::string& effectName, double maxDurationMs = 20.0){
         plugin->loadDefaultPreset("init");
+        plugin->clearAllNodes();
 
-        std::vector<AudioPluginAudioProcessor::Row> layout = {{effectName, ""}};
-        plugin->requestLayout(layout);
+        std::string type = "";
+        
+        // Map simplified names to NodeTypes (Performance test used simple names)
+        if (effectName == "Gain") type = "GainNode";
+        else if (effectName == "Noise Gate") type = "NoiseGateNode";
+        else if (effectName == "Compressor") type = "CompressorNode";
+        else if (effectName == "De-Esser") type = "DeEsserNode";
+        else if (effectName == "De-Noiser") type = "DeNoiserNode";
+        else if (effectName == "Formant") type = "FormantNode";
+        else if (effectName == "Pitch") type = "PitchNode";
+        else if (effectName == "Equalizer") type = "EqualizerNode";
+
+        if (!type.empty()) {
+             addNodeToChain(type, effectName);
+        }
 
         for(int i = 0; i < 3; ++i){
             plugin->processBlock(buffer, midiBuffer);

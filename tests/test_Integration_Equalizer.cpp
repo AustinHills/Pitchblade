@@ -82,9 +82,15 @@ protected:
 
     void insertEqualizerNode()
     {
-        std::vector<AudioPluginAudioProcessor::Row> layout;
-        layout.push_back({ "Equalizer", "" });
-        processor.requestLayout(layout);
+        processor.clearAllNodes();
+        
+        auto chain = processor.apvts.state.getChildWithName("Chain");
+        juce::ValueTree newNode("EqualizerNode");
+        newNode.setProperty("name", "Equalizer", nullptr);
+        newNode.setProperty("uuid", juce::Uuid().toString(), nullptr);
+        
+        chain.addChild(newNode, -1, &processor.undoManager);
+        processor.syncChainFromState();
     }
 };
 

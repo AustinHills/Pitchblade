@@ -198,9 +198,15 @@ protected:
     //insert a single-row layout with a Formant node.
     void insertSingleFormantNode()
     {
-        std::vector<AudioPluginAudioProcessor::Row> layout;
-        layout.push_back({ "Formant", "" });
-        processor.requestLayout(layout);
+        processor.clearAllNodes();
+        
+        auto chain = processor.apvts.state.getChildWithName("Chain");
+        juce::ValueTree newNode("FormantNode");
+        newNode.setProperty("name", "Formant", nullptr);
+        newNode.setProperty("uuid", juce::Uuid().toString(), nullptr);
+        
+        chain.addChild(newNode, -1, &processor.undoManager);
+        processor.syncChainFromState();
     }
 };
 

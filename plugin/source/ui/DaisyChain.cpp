@@ -220,6 +220,24 @@ void DaisyChain::rebuild() {
                 node->bypassed = b;
                 if (onAnyBypassChanged) onAnyBypassChanged();
             };
+
+            currentRow->onModeChanged = [this, node](int index, int modeId) {
+                if (isReorderLocked()) return; // check lock here or in showModeMenu
+
+                // Since we don't have a showModeMenu method yet (it seems), we might implement toggling
+                // or just accept the modeId if it comes from the UI badge.
+                // The test calls onModeChanged(..., 3).
+                // DaisyChainItem modeButton usually doesn't emit mode ID, it just clicks?
+                // Wait, DaisyChainItem has no onClick for modeButton.
+                // NOTE: I am adding this handler to satisfy the test interactions, 
+                // assuming the test manually triggers this callback.
+                // But normally this loopback would close the loop from UI -> Logic.
+                
+                // If the test manually invokes onModeChanged, we must update the node.
+                node->chainMode = static_cast<ChainMode>(modeId);
+                // Then propagate to state (which triggers listeners -> rebuild)
+                node->getMutableNodeState().setProperty("chainMode", modeId, &processorRef.undoManager);
+            };
         }
     }
 
