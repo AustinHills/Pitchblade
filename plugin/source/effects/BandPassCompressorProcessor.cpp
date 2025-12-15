@@ -27,15 +27,13 @@ void BandPassCompressorProcessor::prepare(const double sRate, int samplesPerBloc
     for (int i = 0; i < 2; ++i)
     {
         lowBandFilters[i].prepare(spec);
-        lowBandFilters[i].reset();
-        
         midBandLowFilters[i].prepare(spec);
-        midBandLowFilters[i].reset();
-
         midBandHighFilters[i].prepare(spec);
-        midBandHighFilters[i].reset();
-
         highBandFilters[i].prepare(spec);
+        
+        lowBandFilters[i].reset();
+        midBandLowFilters[i].reset();
+        midBandHighFilters[i].reset();
         highBandFilters[i].reset();
     }
 
@@ -113,11 +111,18 @@ void BandPassCompressorProcessor::updateFilters()
 
     for (int i = 0; i < 2; ++i)
     {
-        lowBandFilters[i].coefficients = lowPassCoeffs;
-        highBandFilters[i].coefficients = highPassCoeffs;
+        // Apply coeffs to both filters in the chain to create 4th order (Cascaded)
+        *lowBandFilters[i].get<0>().coefficients = *lowPassCoeffs;
+        *lowBandFilters[i].get<1>().coefficients = *lowPassCoeffs;
         
-        midBandLowFilters[i].coefficients = midLowPassCoeffs;
-        midBandHighFilters[i].coefficients = midHighPassCoeffs;
+        *highBandFilters[i].get<0>().coefficients = *highPassCoeffs;
+        *highBandFilters[i].get<1>().coefficients = *highPassCoeffs;
+        
+        *midBandLowFilters[i].get<0>().coefficients = *midLowPassCoeffs;
+        *midBandLowFilters[i].get<1>().coefficients = *midLowPassCoeffs;
+        
+        *midBandHighFilters[i].get<0>().coefficients = *midHighPassCoeffs;
+        *midBandHighFilters[i].get<1>().coefficients = *midHighPassCoeffs;
     }
 }
 
@@ -157,15 +162,23 @@ void BandPassCompressorProcessor::process(juce::AudioBuffer<float>& buffer)
             // But here the filters are parallel/independent in logic, but sequential in code.
             
             // Path 1: Low Band (< Min)
-            lowSample[ch] = lowBandFilters[ch].processSample(in);
-            
-            // Path 2: Mid Band (Min <-> Max)
-            // We chain HP(Min) -> LP(Max).
-            float tmp = midBandLowFilters[ch].processSample(in);
-            midSample[ch] = midBandHighFilters[ch].processSample(tmp);
-            
-            // Path 3: High Band (> Max)
-            highSample[ch] = highBandFilters[ch].processSample(in);
+        // lowSample[ch] = lowBandFilters[ch].processSample(in);
+        // ProcessorChain uses process(context), but for single sample loop we can use a helper or just context
+        // But ProcessorChain doesn't have processSample(). We must use context.
+        // Actually, for IIR filters, we can just call processSample on each manually or wrap it.
+        // Let's use get<0>().processSample(get<1>().processSample(in))
+        
+        float low = lowBandFilters[ch].get<0>().processSample(lowBandFilters[ch].get<1>().processSample(in));
+        lowSample[ch] = low;
+        
+        // Path 2: Mid Band (Min <-> Max)
+        // HighPass(Min) -> LowPass(Max)
+        // Filter Order: Chain(HP) -> Chain(LP)
+        float midTmp = midBandLowFilters[ch].get<0>().processSample(midBandLowFilters[ch].get<1>().processSample(in));
+        midSample[ch] = midBandHighFilters[ch].get<0>().processSample(midBandHighFilters[ch].get<1>().processSample(midTmp));
+        
+        // Path 3: High Band (> Max)
+        highSample[ch] = highBandFilters[ch].get<0>().processSample(highBandFilters[ch].get<1>().processSample(in));
             
             // Track max magnitude for envelope
             float absMid = std::abs(midSample[ch]);

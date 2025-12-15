@@ -27,20 +27,23 @@ private:
     double sampleRate = 44100.0;
 
     // Filters for splitting the bands
-    // We need 4 filter pairs (Stereo) to create a 3-way split: 
-    // Low (< Min), Mid (Min-Max), High (> Max)
-    
+    // Filter Logic:
+    // We use Linkwitz-Riley 4th Order (24dB/oct) crossovers to ensure flat magnitude summing.
+    // LR-4 is created by cascading two Butterworth 2nd Order filters.
+    using FilterType = juce::dsp::IIR::Filter<float>;
+    using FilterChain = juce::dsp::ProcessorChain<FilterType, FilterType>;
+
     // LowPass at MinFrequency (For the Low Band)
-    std::array<juce::dsp::IIR::Filter<float>, 2> lowBandFilters;
+    std::array<FilterChain, 2> lowBandFilters;
     
     // HighPass at MinFrequency (Start of Mid Band)
-    std::array<juce::dsp::IIR::Filter<float>, 2> midBandLowFilters;
+    std::array<FilterChain, 2> midBandLowFilters;
     
     // LowPass at MaxFrequency (End of Mid Band)
-    std::array<juce::dsp::IIR::Filter<float>, 2> midBandHighFilters;
+    std::array<FilterChain, 2> midBandHighFilters;
 
     // HighPass at MaxFrequency (For the High Band)
-    std::array<juce::dsp::IIR::Filter<float>, 2> highBandFilters;
+    std::array<FilterChain, 2> highBandFilters;
 
     // Updates internal coefficients
     void updateAttackAndRelease();

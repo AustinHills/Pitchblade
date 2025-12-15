@@ -27,12 +27,13 @@ BandPassCompressorVisualizer::~BandPassCompressorVisualizer()
 void BandPassCompressorVisualizer::updateThresholds()
 {
     // Mode 1 of FrequencyGraphVisualizer uses xThreshold and yThreshold.
-    // User requested: yThreshold at 0, xThreshold at lower bound.
+    // User requested: xThreshold at lower bound (Min Freq), yThreshold at Threshold Level.
     float minFreq = (float)localState.getProperty("BandPassMinFreq", 200.0f);
+    float threshDb = (float)localState.getProperty("BandPassThreshold", 0.0f);
     
-    // We force yThreshold to 0 as requested, though usually it's used for amplitude threshold.
-    // However, the prompt says "yThreshold being at 0".
-    setThreshold(minFreq, 0.0f); 
+    // xThreshold = Min Frequency
+    // yThreshold = Threshold DB
+    setThreshold(minFreq, threshDb); 
 }
 
 void BandPassCompressorVisualizer::timerCallback()
@@ -48,7 +49,9 @@ void BandPassCompressorVisualizer::valueTreePropertyChanged(juce::ValueTree& tre
 {
     if (tree == localState)
     {
-        if (property == juce::Identifier("BandPassMinFreq") || property == juce::Identifier("BandPassMaxFreq"))
+        if (property == juce::Identifier("BandPassMinFreq") || 
+            property == juce::Identifier("BandPassMaxFreq") ||
+            property == juce::Identifier("BandPassThreshold"))
         {
             updateThresholds();
             repaint();
@@ -282,13 +285,13 @@ void BandPassCompressorNode::process(AudioPluginAudioProcessor& proc, juce::Audi
 
     
     auto& s = getNodeState();
-    dsp.setThreshold((float)s.getProperty("BandPassThreshold"));
-    dsp.setRatio((float)s.getProperty("BandPassRatio"));
-    dsp.setAttack((float)s.getProperty("BandPassAttack"));
-    dsp.setRelease((float)s.getProperty("BandPassRelease"));
-    dsp.setMinFrequency((float)s.getProperty("BandPassMinFreq"));
-    dsp.setMaxFrequency((float)s.getProperty("BandPassMaxFreq"));
-    dsp.setListen((bool)s.getProperty("BandPassListen"));
+    dsp.setThreshold((float)s.getProperty("BandPassThreshold", 0.0f));
+    dsp.setRatio((float)s.getProperty("BandPassRatio", 3.0f));
+    dsp.setAttack((float)s.getProperty("BandPassAttack", 10.0f));
+    dsp.setRelease((float)s.getProperty("BandPassRelease", 100.0f));
+    dsp.setMinFrequency((float)s.getProperty("BandPassMinFreq", 200.0f));
+    dsp.setMaxFrequency((float)s.getProperty("BandPassMaxFreq", 2000.0f));
+    dsp.setListen((bool)s.getProperty("BandPassListen", false));
 
     dsp.process(buffer);
 }
