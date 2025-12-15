@@ -80,6 +80,7 @@ target_sources(${PROJECT_NAME}
         source/panels/FormantPanel.cpp
         source/panels/PitchPanel.cpp
         source/panels/CompressorPanel.cpp
+        source/panels/BandPassCompressorPanel.cpp
         source/panels/DeEsserPanel.cpp
         source/panels/DeNoiserPanel.cpp
         source/panels/SettingsPanel.cpp
@@ -95,6 +96,7 @@ target_sources(${PROJECT_NAME}
         source/effects/PitchCorrector.cpp
         source/effects/PitchShifter.cpp
         source/effects/CompressorProcessor.cpp
+        source/effects/BandPassCompressorProcessor.cpp
         source/effects/FormantShifter.cpp
         source/effects/DeEsserProcessor.cpp
         source/effects/DeNoiserProcessor.cpp

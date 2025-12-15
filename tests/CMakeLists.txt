@@ -38,6 +38,7 @@ add_executable(runTests
     test_DeNoiserProcessor.cpp
     test_SaturationProcessor.cpp
     test_UI_DaisyChain.cpp
+    test_BandPassCompressorProcessor.cpp
     test_FormantShifter.cpp
     test_FormantDetector.cpp
     test_Equalizer.cpp

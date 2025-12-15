@@ -4,6 +4,7 @@
 #include "Pitchblade/panels/GainPanel.h"
 #include "Pitchblade/panels/NoiseGatePanel.h"
 #include "Pitchblade/panels/CompressorPanel.h"
+#include "Pitchblade/panels/BandPassCompressorPanel.h"
 #include "Pitchblade/panels/DeEsserPanel.h"
 #include "Pitchblade/panels/DeNoiserPanel.h"
 #include "Pitchblade/panels/SaturationPanel.h"
@@ -191,6 +192,22 @@ juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::c
         "COMP_RELEASE", "Compressor Release", juce::NormalisableRange<float>(1.0f, 300.0f, 0.1f), 100.0f));
     params.push_back(std::make_unique<juce::AudioParameterBool>(
         "COMP_LIMITER_MODE", "Compressor Limiter Mode", "False"));
+
+    // BandPassCompressor : austin
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "BANDPASS_THRESHOLD", "BandPass Threshold", juce::NormalisableRange<float>(-100.0f, 0.0f, 0.1f), 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "BANDPASS_RATIO", "BandPass Ratio", juce::NormalisableRange<float>(1.0f, 20.0f, 0.1f), 3.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "BANDPASS_ATTACK", "BandPass Attack", juce::NormalisableRange<float>(1.0f, 200.0f, 1.0f), 10.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "BANDPASS_RELEASE", "BandPass Release", juce::NormalisableRange<float>(10.0f, 1000.0f, 1.0f), 100.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "BANDPASS_MIN_FREQ", "BandPass Min Freq", juce::NormalisableRange<float>(20.0f, 20000.0f, 1.0f), 200.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "BANDPASS_MAX_FREQ", "BandPass Max Freq", juce::NormalisableRange<float>(20.0f, 20000.0f, 1.0f), 2000.0f));
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        "BANDPASS_LISTEN", "BandPass Listen", false));
 
 	// De-Esser : austin
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
@@ -568,6 +585,7 @@ std::shared_ptr<EffectNode> AudioPluginAudioProcessor::createNodeFromState(const
     if      (type == "GainNode")        node = std::make_shared<GainNode>(*this, state);
     else if (type == "NoiseGateNode")   node = std::make_shared<NoiseGateNode>(*this, state);
     else if (type == "CompressorNode")  node = std::make_shared<CompressorNode>(*this, state);
+    else if (type == "BandPassCompressorNode") node = std::make_shared<BandPassCompressorNode>(*this, state);
     else if (type == "DeEsserNode")     node = std::make_shared<DeEsserNode>(*this, state);
     else if (type == "DeNoiserNode")    node = std::make_shared<DeNoiserNode>(*this, state);
     else if (type == "AdaptiveDeNoiserNode")    node = std::make_shared<AdaptiveDeNoiserNode>(*this, state);
