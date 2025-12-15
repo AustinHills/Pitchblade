@@ -54,7 +54,9 @@ void VST3Node::ScannerThread::run()
         searchPath.add("/Library/Audio/Plug-Ins/VST3");
         searchPath.add("~/Library/Audio/Plug-Ins/VST3");
     #else
+        searchPath.add(juce::File::getSpecialLocation(juce::File::userHomeDirectory).getChildFile(".vst3"));
         searchPath.add("/usr/lib/vst3");
+        searchPath.add("/usr/local/lib/vst3");
     #endif
 
     // [FIX] Lock during the entire background scan to prevent races with foreground actions
@@ -695,7 +697,9 @@ void VST3Node::loadFromXml(const juce::XmlElement& xml) {
                 searchPath.add("/Library/Audio/Plug-Ins/VST3");
                 searchPath.add("~/Library/Audio/Plug-Ins/VST3");
             #else
+                searchPath.add(juce::File::getSpecialLocation(juce::File::userHomeDirectory).getChildFile(".vst3"));
                 searchPath.add("/usr/lib/vst3");
+                searchPath.add("/usr/local/lib/vst3");
             #endif
 
             // Sync scan into global list

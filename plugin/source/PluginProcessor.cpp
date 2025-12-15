@@ -23,6 +23,7 @@
 #include <exception>
 
 #include <chrono>
+#include <iostream>
 
 #if JUCE_WINDOWS
  #include <windows.h>
@@ -66,6 +67,7 @@ void handleCrash(const juce::String& source)
     #if JUCE_WINDOWS
         ::MessageBoxA(nullptr, msg.toRawUTF8(), "Pitchblade Crash Reporter", MB_OK | MB_ICONERROR);
     #else
+        std::cerr << msg << std::endl;
         juce::NativeMessageBox::showMessageBoxAsync(juce::AlertWindow::WarningIcon, "Pitchblade Crash", msg);
         juce::Thread::sleep(3000); 
     #endif
