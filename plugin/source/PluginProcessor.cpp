@@ -9,6 +9,7 @@
 #include "Pitchblade/panels/DeNoiserPanel.h"
 #include "Pitchblade/panels/SaturationPanel.h"
 #include "Pitchblade/panels/EffectNode.h"
+#include "Pitchblade/panels/AutoGainPanel.h"
 //huda
 #include "Pitchblade/panels/FormantPanel.h"
 #include "Pitchblade/panels/EqualizerPanel.h"
@@ -234,6 +235,16 @@ juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::c
         "SAT_DRIVE", "Saturation Drive", juce::NormalisableRange<float>(0.0f, 24.0f, 0.1f), 0.0f));
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "SAT_MIX", "Saturation Mix", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 1.0f));
+
+    // AutoGain : austin
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "AUTOGAIN_TARGET", "AutoGain Target", juce::NormalisableRange<float>(-60.0f, 0.0f, 0.1f), -6.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "AUTOGAIN_THRESHOLD", "AutoGain Threshold", juce::NormalisableRange<float>(-100.0f, 0.0f, 0.1f), -40.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "AUTOGAIN_ATTACK", "AutoGain Attack", juce::NormalisableRange<float>(0.1f, 500.0f, 0.1f), 20.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "AUTOGAIN_RELEASE", "AutoGain Release", juce::NormalisableRange<float>(10.0f, 2000.0f, 0.1f), 200.0f));
 
 	// Formant Shifter : huda
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
@@ -590,6 +601,7 @@ std::shared_ptr<EffectNode> AudioPluginAudioProcessor::createNodeFromState(const
     else if (type == "DeNoiserNode")    node = std::make_shared<DeNoiserNode>(*this, state);
     else if (type == "AdaptiveDeNoiserNode")    node = std::make_shared<AdaptiveDeNoiserNode>(*this, state);
     else if (type == "SaturationNode")          node = std::make_shared<SaturationNode>(*this, state);
+    else if (type == "AutoGainNode")            node = std::make_shared<AutoGainNode>(*this, state);
     else if (type == "EqualizerNode")   node = std::make_shared<EqualizerNode>(*this, state);  
     else if (type == "PitchNode")       node = std::make_shared<PitchNode>(*this, state);
     else if (type == "FormantNode")     node = std::make_shared<FormantNode>(*this, state);

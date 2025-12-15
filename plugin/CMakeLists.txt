@@ -88,7 +88,9 @@ target_sources(${PROJECT_NAME}
         source/panels/VST3Panel.cpp
         source/panels/AdaptiveDeNoiserPanel.cpp
         source/panels/SaturationPanel.cpp
+        source/panels/AutoGainPanel.cpp
 
+        source/effects/AutoGainProcessor.cpp
         source/effects/GainProcessor.cpp
         source/effects/NoiseGateProcessor.cpp
         source/effects/FormantDetector.cpp

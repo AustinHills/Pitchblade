@@ -29,6 +29,7 @@ endif()
 add_executable(runTests
     # List all your test files here as you create them
     test_main.cpp
+    test_AutoGainProcessor.cpp
     test_GainProcessor.cpp
     test_PitchDetector.cpp
     test_PitchCorrector.cpp
