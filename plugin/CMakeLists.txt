@@ -102,6 +102,7 @@ target_sources(${PROJECT_NAME}
         source/panels/AdaptiveDeNoiserPanel.cpp
         source/panels/SaturationPanel.cpp
         source/panels/AutoGainPanel.cpp
+        source/panels/EffectNode.cpp
 
         source/effects/AutoGainProcessor.cpp
         source/effects/GainProcessor.cpp
