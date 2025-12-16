@@ -11,8 +11,8 @@ FrequencyGraphVisualizer::FrequencyGraphVisualizer(juce::AudioProcessorValueTree
     numYAxisLabels = numYLabels;
 
     //Log transformed frequency range
-    logFreqStart = log10(xAxisRange.getStart());
-    logFreqEnd = log10(xAxisRange.getEnd());
+    logFreqStart = std::log10(xAxisRange.getStart());
+    logFreqEnd = std::log10(xAxisRange.getEnd());
 
     //Listen to framerate parameter
     apvts.addParameterListener("GLOBAL_FRAMERATE",this);
@@ -435,7 +435,7 @@ float FrequencyGraphVisualizer::mapFreqToX(float freq) const{
     const float graphR = (float)graphBounds.getRight();
 
     //Lots simpler than the other one since the range is fixed and starts at 20
-    return juce::jmap(log10(freq),logFreqStart,logFreqEnd,graphX,graphR);
+    return juce::jmap(std::log10(freq),logFreqStart,logFreqEnd,graphX,graphR);
 }
 
 //If the user changes the FPS in the settings, change it

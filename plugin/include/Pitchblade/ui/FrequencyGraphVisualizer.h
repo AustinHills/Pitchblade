@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include <vector>
+#include <cmath>
 #include <JuceHeader.h>
 #include "Pitchblade/ui/ColorPalette.h"
 
