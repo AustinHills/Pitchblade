@@ -332,6 +332,17 @@ void AudioPluginAudioProcessor::savePresetToFile(const juce::File& file) {
 // loading presets from file
 void AudioPluginAudioProcessor::loadPresetFromFile(const juce::File& file) {
     std::lock_guard<std::recursive_mutex> lock(audioMutex);
+    
+    // Capture current global settings (Normalized 0..1)
+    float storedTheme = 0.0f;
+    float storedFramerate = 0.0f;
+    
+    auto* themeParam = apvts.getParameter("GLOBAL_THEME");
+    auto* fpsParam   = apvts.getParameter("GLOBAL_FRAMERATE");
+
+    if (themeParam) storedTheme = themeParam->getValue();
+    if (fpsParam)   storedFramerate = fpsParam->getValue();
+
     std::unique_ptr<juce::XmlElement> xml(juce::XmlDocument::parse(file));
     if (!xml) return;
 
@@ -342,6 +353,12 @@ void AudioPluginAudioProcessor::loadPresetFromFile(const juce::File& file) {
         
         if (newState.isValid()) {
             apvts.replaceState(newState);
+            
+            // Restore global settings explicitly after state replacement
+            // This ensures the parameter value is forcefully set to the stored value
+            if (themeParam) themeParam->setValueNotifyingHost(storedTheme);
+            if (fpsParam)   fpsParam->setValueNotifyingHost(storedFramerate);
+
             // Ensure Chain child exists
             if (!apvts.state.getChildWithName("Chain").isValid())
                 apvts.state.addChild(juce::ValueTree("Chain"), -1, nullptr);
