@@ -29,6 +29,7 @@ public:
     void paint(juce::Graphics&) override;
 	void setGlobalBypassVisual(bool globalBypassed);    // grayed out when global bypassed
 	void setChainControlsEnabled(bool enabled);         // enable/disable chain controls
+    void refreshColors();
 
 	//refeshes ui from effectnodes
     void rebuild();
