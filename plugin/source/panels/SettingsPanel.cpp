@@ -37,6 +37,74 @@ SettingsPanel::SettingsPanel(AudioPluginAudioProcessor& p) : processor(p) {
         #endif
     };
 
+    // Monitor Device Configuration (Standalone Only)
+    if (juce::JUCEApplication::isStandaloneApp()) {
+        
+        // 1. Device Selector
+        addAndMakeVisible(monitorDeviceLabel);
+        monitorDeviceLabel.setText("Monitor Output:", juce::dontSendNotification);
+        monitorDeviceLabel.setJustificationType(juce::Justification::centredLeft);
+        monitorDeviceLabel.setColour(juce::Label::textColourId, Colors::buttonText);
+
+        addAndMakeVisible(monitorDeviceSelector);
+        
+        // Populate Device List
+        // Note: In real setup, we might need to refresh this. For now, init once.
+        const auto& deviceTypes = processor.monitorDeviceManager.getAvailableDeviceTypes();
+        int itemId = 1;
+        
+        // Add "None" option
+        monitorDeviceSelector.addItem("None", itemId++);
+
+        for (auto* type : deviceTypes) {
+            auto devices = type->getDeviceNames(); 
+            for (const auto& deviceName : devices) {
+                // Skip if it looks like an input-only device? 
+                // device names are just strings. 
+                monitorDeviceSelector.addItem(deviceName + " (" + type->getTypeName() + ")", itemId++);
+            }
+        }
+        
+        // Restore selection if possible (would need saved state, skipping for now)
+        monitorDeviceSelector.onChange = [this] {
+            // Parse name from text or maintain a map. Simplest is text for now.
+            // Items format: "DeviceName (TypeName)"
+            // Use ID to map back? Or just pass full text?
+            // Since we stored name+type, we need to extract name or just pass name if it's unique enough.
+            // Let's assume for this MVP we just pass the raw "Device Name" part.
+            // Actually, setMonitorDevice expects exact name for `outputDeviceName`.
+            
+            auto text = monitorDeviceSelector.getText();
+            if (text == "None") {
+                 processor.setMonitorDevice("");
+                 return;
+            }
+
+            // quick hack to strip (Type)
+            int bracket = text.lastIndexOf("(");
+            if (bracket > 0) {
+                auto name = text.substring(0, bracket).trim();
+                processor.setMonitorDevice(name);
+            }
+        };
+
+        // 2. Volume Slider
+        addAndMakeVisible(monitorGainLabel);
+        monitorGainLabel.setText("Monitor Vol:", juce::dontSendNotification);
+        monitorGainLabel.setJustificationType(juce::Justification::centredLeft);
+        monitorGainLabel.setColour(juce::Label::textColourId, Colors::buttonText);
+
+        addAndMakeVisible(monitorGainSlider);
+        monitorGainSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+        monitorGainSlider.setTextBoxStyle(juce::Slider::TextBoxLeft, false, 50, 20);
+        monitorGainSlider.setRange(0.0, 1.0, 0.01);
+        monitorGainSlider.setValue(processor.monitorVolume.load());
+        
+        monitorGainSlider.onValueChange = [this] {
+            processor.monitorVolume.store((float)monitorGainSlider.getValue());
+        };
+    }
+
     //License stuff
     addAndMakeVisible(licenseText);
     licenseText.setMultiLine(true);
@@ -102,6 +170,21 @@ void SettingsPanel::resized(){
         audioSettingsButton.setBounds(area.removeFromTop(40).reduced(20, 0));
 
         area.removeFromTop(10); 
+        
+        // Monitor Device UI
+        auto monitorArea = area.removeFromTop(40).reduced(20, 0);
+        monitorDeviceLabel.setBounds(monitorArea.removeFromLeft(monitorArea.getWidth() / 3));
+        monitorArea.removeFromLeft(10);
+        monitorDeviceSelector.setBounds(monitorArea);
+        
+        area.removeFromTop(5);
+
+        auto monitorVolArea = area.removeFromTop(40).reduced(20, 0);
+        monitorGainLabel.setBounds(monitorVolArea.removeFromLeft(monitorVolArea.getWidth() / 3));
+        monitorVolArea.removeFromLeft(10);
+        monitorGainSlider.setBounds(monitorVolArea);
+
+        area.removeFromTop(10);
     }
 
     auto framerateArea = area.removeFromTop(40).reduced(20,0);
