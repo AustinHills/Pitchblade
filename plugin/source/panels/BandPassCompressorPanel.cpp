@@ -96,7 +96,7 @@ BandPassCompressorPanel::BandPassCompressorPanel(AudioPluginAudioProcessor& proc
     // Setup LookAndFeel
     static SmallDialLookAndFeel smallDialLF;
 
-    auto setupSlider = [&](juce::Slider& s, juce::Label& l, const juce::String& name, const juce::String& suffix)
+    auto setupSlider = [&](juce::Slider& s, const juce::String& name, const juce::String& suffix)
     {
         s.setName(name);
         s.setSliderStyle(juce::Slider::RotaryVerticalDrag);
@@ -105,18 +105,14 @@ BandPassCompressorPanel::BandPassCompressorPanel(AudioPluginAudioProcessor& proc
         s.setTextValueSuffix(suffix);
         s.setLookAndFeel(&smallDialLF);
         addAndMakeVisible(s);
-
-        l.setText(name, juce::dontSendNotification);
-        l.setJustificationType(juce::Justification::centred);
-        addAndMakeVisible(l);
     };
 
-    setupSlider(thresholdSlider, thresholdLabel, "Threshold", " dB");
-    setupSlider(ratioSlider, ratioLabel, "Ratio", ":1");
-    setupSlider(attackSlider, attackLabel, "Attack", " ms");
-    setupSlider(releaseSlider, releaseLabel, "Release", " ms");
-    setupSlider(minFreqSlider, minFreqLabel, "Min Freq", " Hz");
-    setupSlider(maxFreqSlider, maxFreqLabel, "Max Freq", " Hz");
+    setupSlider(thresholdSlider, "Threshold", " dB");
+    setupSlider(ratioSlider, "Ratio", ":1");
+    setupSlider(attackSlider, "Attack", " ms");
+    setupSlider(releaseSlider, "Release", " ms");
+    setupSlider(minFreqSlider, "Min Freq", " Hz");
+    setupSlider(maxFreqSlider, "Max Freq", " Hz");
 
     listenButton.setButtonText("Listen");
     listenButton.setClickingTogglesState(true);
@@ -178,14 +174,8 @@ BandPassCompressorPanel::~BandPassCompressorPanel()
     maxFreqSlider.setLookAndFeel(nullptr);
 }
 
-void BandPassCompressorPanel::place(juce::Rectangle<int> area, juce::Slider& slider, juce::Label& label)
-{
-    slider.setBounds(area.reduced(5));
-    // Hacky positioning for label
-    label.setBounds(area.getX(), area.getBottom() - 20, area.getWidth(), 20);
-    // Adjust slider to not overlap label too much
-    slider.setBounds(area.withTrimmedBottom(20).reduced(2));
-}
+// place method removed
+// void BandPassCompressorPanel::place(juce::Rectangle<int> area, juce::Slider& slider, juce::Label& label) { ... }
 
 void BandPassCompressorPanel::resized()
 {
@@ -207,13 +197,18 @@ void BandPassCompressorPanel::resized()
     int thirdW = w / 3;
     int quadW = w / 4;
 
-    place(topRow.removeFromLeft(thirdW), minFreqSlider, minFreqLabel);
-    place(topRow.removeFromLeft(thirdW), maxFreqSlider, maxFreqLabel);
-    place(topRow, thresholdSlider, thresholdLabel);
+    // Use setBounds directly now
+    
+    // Helper to set bounds with reduced padding
+    auto setS = [](juce::Rectangle<int> area, juce::Slider& s) { s.setBounds(area.reduced(5)); };
 
-    place(bottomRow.removeFromLeft(quadW), ratioSlider, ratioLabel);
-    place(bottomRow.removeFromLeft(quadW), attackSlider, attackLabel);
-    place(bottomRow.removeFromLeft(quadW), releaseSlider, releaseLabel);
+    setS(topRow.removeFromLeft(thirdW), minFreqSlider);
+    setS(topRow.removeFromLeft(thirdW), maxFreqSlider);
+    setS(topRow, thresholdSlider);
+
+    setS(bottomRow.removeFromLeft(quadW), ratioSlider);
+    setS(bottomRow.removeFromLeft(quadW), attackSlider);
+    setS(bottomRow.removeFromLeft(quadW), releaseSlider);
     
     // Listen button take remaining space
     listenButton.setBounds(bottomRow.reduced(10));

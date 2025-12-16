@@ -160,10 +160,25 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
     
     // Add listener to the main state (or specifically the chain)
     apvts.state.addListener(this);
+
+    // Initialize Monitor Buffer
+    monitorBuffer.setSize(2, 48000);
+    monitorBuffer.clear();
+
+    // Initialize Monitor Device Manager (if Standalone) - scans for devices
+    if (juce::JUCEApplication::isStandaloneApp()) {
+        monitorDeviceManager.initialise(0, 2, nullptr, true);
+        monitorDeviceManager.addAudioCallback(&monitorCallback);
+    }
 }
 
 // Destructor: ensures processor is suspended when the its deleted
-AudioPluginAudioProcessor::~AudioPluginAudioProcessor(){ suspendProcessing(true); }
+AudioPluginAudioProcessor::~AudioPluginAudioProcessor(){ 
+    if (juce::JUCEApplication::isStandaloneApp()) {
+        monitorDeviceManager.removeAudioCallback(&monitorCallback);
+    }
+    suspendProcessing(true); 
+}
 
 //============================================================================== reyna
 // global APVTS parameter layout
@@ -284,6 +299,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::c
     //Settings Panel: austin
     params.push_back(std::make_unique<juce::AudioParameterInt>(
         "GLOBAL_FRAMERATE", "Global Framerate", 1, 4, 3));
+
+    //Theme: reyna
+    params.push_back(std::make_unique<juce::AudioParameterInt>(
+        "GLOBAL_THEME", "Theme", 0, 4, 0)); // 0: Dark, 1: Light, 2: Sunset, 3: Pink, 4: Green
 
     return { params.begin(), params.end() };
 }
@@ -499,7 +518,40 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, 
         buffer.clear(i, 0, buffer.getNumSamples());
     }
 
-    
+    // ============================================================
+    // Standalone Monitor Output Logic
+    // ============================================================
+    if (juce::JUCEApplication::isStandaloneApp() && monitorDeviceManager.getCurrentAudioDevice() != nullptr) {
+        // 1. Get Mixed Stereo Signal (taking main L/R)
+        // We assume Main Output is channels 0 and 1.
+        if (buffer.getNumChannels() >= 2) {
+            float rawVol = monitorVolume.load();
+            float vol = rawVol * rawVol; // Quadratic taper for balanced feels
+            int numSamples = buffer.getNumSamples();
+
+            // Prepare to write to FIFO
+            // We want to write 'numSamples' into the ring buffer
+            int start1, size1, start2, size2;
+            monitorFifo.prepareToWrite(numSamples, start1, size1, start2, size2);
+            
+
+
+            if (size1 > 0) {
+                for (int ch = 0; ch < 2; ++ch) {
+                    // Copy and Apply Volume
+                    monitorBuffer.copyFrom(ch, start1, buffer, ch, 0, size1);
+                    monitorBuffer.applyGain(ch, start1, size1, vol);
+                }
+            }
+            if (size2 > 0) {
+                for (int ch = 0; ch < 2; ++ch) {
+                    monitorBuffer.copyFrom(ch, start2, buffer, ch, size1, size2);
+                    monitorBuffer.applyGain(ch, start2, size2, vol);
+                }
+            }
+            monitorFifo.finishedWrite(size1 + size2);
+        }
+    }
 }
 
 //==============================================================================
@@ -762,4 +814,94 @@ void AudioPluginAudioProcessor::valueTreePropertyChanged(juce::ValueTree& tree, 
         syncChainFromState();
         triggerUIRebuild();
     }
+}
+
+
+//==============================================================================
+// Standalone Monitor Implementation
+//==============================================================================
+
+void AudioPluginAudioProcessor::MonitorOutputCallback::audioDeviceIOCallbackWithContext(
+    const float* const* inputChannelData,
+    int numInputChannels,
+    float* const* outputChannelData,
+    int numOutputChannels,
+    int numSamples,
+    const juce::AudioIODeviceCallbackContext& context)
+{
+    juce::ignoreUnused(inputChannelData, numInputChannels, context);
+    
+    // Safety check
+    if (numOutputChannels == 0 || outputChannelData == nullptr) return;
+
+    // Clear buffer first
+    for (int i = 0; i < numOutputChannels; ++i)
+        if (outputChannelData[i])
+            juce::FloatVectorOperations::clear(outputChannelData[i], numSamples);
+
+    // Read from FIFO
+    int start1, size1, start2, size2;
+    owner.monitorFifo.prepareToRead(numSamples, start1, size1, start2, size2);
+
+    // If we don't have enough data (Underrun), simply output silence (already cleared)
+    // and DO NOT advance read pointer. Or we could advance up to available?
+    // Standard ring buffer logic: if empty, play silence.
+    int totalAvailable = size1 + size2;
+    
+    if (totalAvailable < numSamples) {
+        // Buffer Underrun - Just play silence (we already cleared output)
+
+        return; 
+    }
+
+    // Read Logic
+    if (size1 > 0) {
+        for (int i = 0; i < juce::jmin(2, numOutputChannels); ++i) {
+             juce::FloatVectorOperations::copy(outputChannelData[i], 
+                                             owner.monitorBuffer.getReadPointer(i, start1),
+                                             size1);
+        }
+    }
+    if (size2 > 0) {
+        for (int i = 0; i < juce::jmin(2, numOutputChannels); ++i) {
+              // Offset output ptr by size1
+             juce::FloatVectorOperations::copy(outputChannelData[i] + size1, 
+                                             owner.monitorBuffer.getReadPointer(i, start2),
+                                             size2);
+        }
+    }
+
+    owner.monitorFifo.finishedRead(size1 + size2);
+}
+
+void AudioPluginAudioProcessor::setMonitorDevice(const juce::String& deviceName) {
+    if (deviceName.isEmpty()) {
+        monitorDeviceManager.closeAudioDevice();
+        return;
+    }
+
+    // Check if it's already current
+    auto* current = monitorDeviceManager.getCurrentAudioDevice();
+    if (current && current->getName() == deviceName) return;
+
+    // Initialize with specific device
+    // We want 0 inputs, 2 outputs.
+    // NOTE: This usually needs to be done on Message Thread. This function is called from UI, so it is safe.
+    juce::AudioDeviceManager::AudioDeviceSetup setup;
+    monitorDeviceManager.getAudioDeviceSetup(setup);
+    
+    setup.outputDeviceName = deviceName;
+    setup.inputDeviceName = ""; // No input for monitor
+    setup.useDefaultInputChannels = false;
+    setup.useDefaultOutputChannels = true;
+    
+    // Try to init
+    // initialise(numInputChannelsNeeded, numOutputChannelsNeeded, savedStateXml, selectDefaultDeviceOnFailure, preferredDefaultDeviceName, preferredSetupOptions)
+    // We use setAudioDeviceSetup which is cleaner for switching
+    
+    // monitorDeviceManager.setAudioDeviceSetup(setup, true);
+    juce::String err = monitorDeviceManager.setAudioDeviceSetup(setup, true);
+    
+    // reset fifo just in case
+    monitorFifo.reset();
 }

@@ -26,6 +26,24 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
                                                                     visualizer(p, p.getEffectNodes()),
                                                                     settingsPanel(p), presetsPanel(p)
 {   
+    // Listen for theme changes
+    processorRef.apvts.addParameterListener("GLOBAL_THEME", this);
+    
+    // Initialize Theme from current parameter value
+    if (auto* param = processorRef.apvts.getRawParameterValue("GLOBAL_THEME")) {
+        int themeIdx = (int)*param;
+        if (themeIdx >= 0 && themeIdx <= 4) {
+             Colors::setTheme(static_cast<Colors::Theme>(themeIdx));
+        }
+    }
+
+    // Refresh all panels with the loaded theme
+    customLF.refreshColors();
+    settingsPanel.refreshColors();
+    topBar.refreshColors();
+    daisyChain.refreshColors();
+    presetsPanel.refreshColors();
+
     //Austin
     //Stuff for the settings panel. Making a listener and setting it to invisible to start
     addAndMakeVisible(settingsPanel);
@@ -407,6 +425,7 @@ void AudioPluginAudioProcessorEditor::setActiveEffectByName(const juce::String& 
 }
 
 AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor() {
+    processorRef.apvts.removeParameterListener("GLOBAL_THEME", this);
 	setLookAndFeel(nullptr); //reset look and feel
 }
 
@@ -505,6 +524,36 @@ void AudioPluginAudioProcessorEditor::buttonClicked(juce::Button* button){
 
     repaint();
     return;
+}
+
+// Listen for theme changes from APVTS
+void AudioPluginAudioProcessorEditor::parameterChanged(const juce::String& parameterID, float newValue) {
+    if (parameterID == "GLOBAL_THEME") {
+        juce::MessageManager::callAsync([this, newValue]() {
+            int themeIndex = (int)newValue;
+            if (themeIndex >= 0 && themeIndex <= 4) {
+                Colors::setTheme(static_cast<Colors::Theme>(themeIndex));
+                customLF.refreshColors();
+                
+                // Specific panel refreshes
+                settingsPanel.refreshColors();
+                topBar.refreshColors();
+                daisyChain.refreshColors();
+                presetsPanel.refreshColors();
+                
+                repaint();
+                
+                // Force a repaint of all children to ensure new colors take effect
+                // Some might need explicit lookandfeel checks if they cached colors
+                sendLookAndFeelChange();
+
+                // Specific panel refreshes if needed
+                settingsPanel.repaint();
+                topBar.repaint();
+                daisyChain.repaint();
+            }
+        });
+    }
 }
 
 // reyna - apply tooltips to every daisychain row

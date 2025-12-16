@@ -84,6 +84,7 @@ target_sources(${PROJECT_NAME}
         source/ui/FrequencyGraphVisualizer.cpp
         source/ui/EqualizerVisualizer.cpp
         source/ui/FormantVisualizer.cpp
+        source/ui/ColorPalette.cpp
         source/panels/PresetsPanel.cpp
         
 

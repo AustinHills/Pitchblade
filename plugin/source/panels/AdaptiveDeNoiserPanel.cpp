@@ -22,9 +22,7 @@ AdaptiveDeNoiserPanel::AdaptiveDeNoiserPanel(AudioPluginAudioProcessor& proc, ju
     addAndMakeVisible(reductionSlider);
 
     //Reduction label
-    reductionLabel.setText("Reduction Intensity",juce::dontSendNotification);
-    reductionLabel.setJustificationType(juce::Justification::centred);
-    addAndMakeVisible(reductionLabel);
+    reductionSlider.setName("Reduction Intensity");
 
     //Threshold slider
     thresholdSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
@@ -33,9 +31,7 @@ AdaptiveDeNoiserPanel::AdaptiveDeNoiserPanel(AudioPluginAudioProcessor& proc, ju
     addAndMakeVisible(thresholdSlider);
 
     //Threshold label
-    thresholdLabel.setText("Learning Threshold",juce::dontSendNotification);
-    thresholdLabel.setJustificationType(juce::Justification::centred);
-    addAndMakeVisible(thresholdLabel);
+    thresholdSlider.setName("Learning Threshold");
 
     //Link sliders to local state properties
     const float startReduction = (float)localState.getProperty("DenoiserReduction",0.5f);
@@ -85,13 +81,11 @@ void AdaptiveDeNoiserPanel::resized(){
     auto thresholdArea = dials.removeFromLeft(columnWidth).reduced(5);
 
     //Positioning threshold label and slider
-    thresholdLabel.setBounds(thresholdArea.removeFromTop(20));
     thresholdSlider.setBounds(thresholdArea);
 
     auto reductionArea = dials.reduced(5);
 
     //Positioning reduction label and slider
-    reductionLabel.setBounds(reductionArea.removeFromTop(20));
     reductionSlider.setBounds(reductionArea);
 }
 

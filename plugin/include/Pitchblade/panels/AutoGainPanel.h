@@ -29,7 +29,7 @@ private:
     juce::Slider targetSlider, thresholdSlider, attackSlider, releaseSlider;
 
     // Labels
-    juce::Label targetLabel, thresholdLabel, attackLabel, releaseLabel;
+    juce::Label titleLabel;
 
     juce::ValueTree localState;
 

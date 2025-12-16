@@ -33,11 +33,15 @@ class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
                                               public juce::DragAndDropContainer,
                                               public juce::Button::Listener,     // Austin -  added this for the settings panel
 	                                          public juce::MouseListener,         // reyna - for presets/settings closing on outside click
-                                              public juce::Timer                 //For CPU usage update
+                                              public juce::Timer,                 //For CPU usage update
+                                              public juce::AudioProcessorValueTreeState::Listener
 {
 public:
     explicit AudioPluginAudioProcessorEditor (AudioPluginAudioProcessor&);
     ~AudioPluginAudioProcessorEditor() override;
+    
+    // Parameter Listener
+    void parameterChanged(const juce::String& parameterID, float newValue) override;
     //==============================================================================
     void paint (juce::Graphics&) override;
     void resized() override;

@@ -8,65 +8,66 @@ AutoGainPanel::AutoGainPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& s
     // Listen to value tree
     localState.addListener(this);
 
+    // --- Title Label ---
+    titleLabel.setText(panelTitle, juce::dontSendNotification);
+    titleLabel.setName("NodeTitle");
+    addAndMakeVisible(titleLabel);
+
     // --- Target Slider ---
     addAndMakeVisible(targetSlider);
     targetSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
     targetSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 50, 20);
+    targetSlider.setNumDecimalPlacesToDisplay(1);
+    targetSlider.setTextValueSuffix(" dB");
     targetSlider.setRange(-60.0, 0.0, 0.1);
     targetSlider.setValue((double)localState.getProperty("AutoGainTarget"));
     targetSlider.onValueChange = [this]() {
         localState.setProperty("AutoGainTarget", targetSlider.getValue(), nullptr);
     };
 
-    addAndMakeVisible(targetLabel);
-    targetLabel.setText("Target dB", juce::dontSendNotification);
-    targetLabel.setJustificationType(juce::Justification::centred);
-    targetLabel.attachToComponent(&targetSlider, false);
+    targetSlider.setName("Target");
 
     // --- Threshold Slider ---
     addAndMakeVisible(thresholdSlider);
     thresholdSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
     thresholdSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 50, 20);
+    thresholdSlider.setNumDecimalPlacesToDisplay(1);
+    thresholdSlider.setTextValueSuffix(" dB");
     thresholdSlider.setRange(-100.0, 0.0, 0.1);
     thresholdSlider.setValue((double)localState.getProperty("AutoGainThreshold"));
     thresholdSlider.onValueChange = [this]() {
         localState.setProperty("AutoGainThreshold", thresholdSlider.getValue(), nullptr);
     };
 
-    addAndMakeVisible(thresholdLabel);
-    thresholdLabel.setText("Threshold", juce::dontSendNotification);
-    thresholdLabel.setJustificationType(juce::Justification::centred);
-    thresholdLabel.attachToComponent(&thresholdSlider, false);
+    thresholdSlider.setName("Threshold");
 
     // --- Attack Slider ---
     addAndMakeVisible(attackSlider);
     attackSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
     attackSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 50, 20);
+    attackSlider.setNumDecimalPlacesToDisplay(1);
+    attackSlider.setTextValueSuffix(" ms");
     attackSlider.setRange(0.1, 500.0, 0.1);
     attackSlider.setValue((double)localState.getProperty("AutoGainAttack"));
     attackSlider.onValueChange = [this]() {
         localState.setProperty("AutoGainAttack", attackSlider.getValue(), nullptr);
     };
 
-    addAndMakeVisible(attackLabel);
-    attackLabel.setText("Attack (ms)", juce::dontSendNotification);
-    attackLabel.setJustificationType(juce::Justification::centred);
-    attackLabel.attachToComponent(&attackSlider, false);
+    attackSlider.setName("Attack");
 
     // --- Release Slider ---
     addAndMakeVisible(releaseSlider);
     releaseSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
     releaseSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 50, 20);
+    releaseSlider.setNumDecimalPlacesToDisplay(1);
+    releaseSlider.setTextValueSuffix(" ms");
     releaseSlider.setRange(10.0, 2000.0, 0.1);
     releaseSlider.setValue((double)localState.getProperty("AutoGainRelease"));
     releaseSlider.onValueChange = [this]() {
         localState.setProperty("AutoGainRelease", releaseSlider.getValue(), nullptr);
     };
 
-    addAndMakeVisible(releaseLabel);
-    releaseLabel.setText("Release (ms)", juce::dontSendNotification);
-    releaseLabel.setJustificationType(juce::Justification::centred);
-    releaseLabel.attachToComponent(&releaseSlider, false);
+    releaseSlider.setName("Release");
 }
 
 AutoGainPanel::~AutoGainPanel()
@@ -76,19 +77,23 @@ AutoGainPanel::~AutoGainPanel()
 
 void AutoGainPanel::resized()
 {
-    auto area = getLocalBounds().reduced(10);
+    auto area = getLocalBounds();
+
+    // Title label at the top
+    titleLabel.setBounds(area.removeFromTop(30));
+
+    auto dials = area.reduced(10);
     
     // Simple 4-column layout
-    int width = area.getWidth() / 4;
-    int height = area.getHeight();
+    int width = dials.getWidth() / 4;
+    int height = dials.getHeight();
     
-    // Add top margin for labels attached to components
-    int topMargin = 20;
-
-    targetSlider.setBounds(area.getX(), area.getY() + topMargin, width, height - topMargin);
-    thresholdSlider.setBounds(area.getX() + width, area.getY() + topMargin, width, height - topMargin);
-    attackSlider.setBounds(area.getX() + width * 2, area.getY() + topMargin, width, height - topMargin);
-    releaseSlider.setBounds(area.getX() + width * 3, area.getY() + topMargin, width, height - topMargin);
+    // No top margin needed labels are inside dials
+    
+    targetSlider.setBounds(dials.getX(), dials.getY(), width, height);
+    thresholdSlider.setBounds(dials.getX() + width, dials.getY(), width, height);
+    attackSlider.setBounds(dials.getX() + width * 2, dials.getY(), width, height);
+    releaseSlider.setBounds(dials.getX() + width * 3, dials.getY(), width, height);
 }
 
 void AutoGainPanel::paint(juce::Graphics& g)

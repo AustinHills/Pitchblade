@@ -18,7 +18,7 @@ private:
     juce::TextButton learnButton {"Learn Noise Profile"};
 
     //Labels
-    juce::Label deNoiserLabel, reductionLabel, statusLabel;
+    juce::Label deNoiserLabel, statusLabel;
 
     juce::ValueTree localState;
 

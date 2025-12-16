@@ -30,9 +30,21 @@ TopBar::TopBar() {
     // Setup CPU Label
     addAndMakeVisible(cpuLabel);
     cpuLabel.setFont(juce::Font(12.0f, juce::Font::bold));
-    cpuLabel.setColour(juce::Label::textColourId, Colors::accentLight);
     cpuLabel.setJustificationType(juce::Justification::centredRight);
+    
+    refreshColors();
+}
 
+void TopBar::refreshColors() {
+    cpuLabel.setColour(juce::Label::textColourId, Colors::accentLight);
+    
+    // Refresh all buttons based on their toggle state
+    setButtonActive(settingsButton, settingsButton.getToggleState());
+    setButtonActive(bypassButton, bypassButton.getToggleState());
+    setButtonActive(presetButton, presetButton.getToggleState());
+    setButtonActive(lockBypassButton, lockBypassButton.getToggleState());
+
+    repaint();
 }
 
 // paint top bar with gradient
@@ -68,6 +80,9 @@ void TopBar::resized() {
 
 // turn button pink if active
 void TopBar::setButtonActive(juce::TextButton& button, bool active) {
+    // Store state so we can refresh it later
+    button.setToggleState(active, juce::dontSendNotification);
+
     const auto color = active ? Colors::accent : Colors::panel;
     button.setColour(juce::TextButton::buttonColourId, color);
     button.setColour(juce::TextButton::buttonOnColourId, color);

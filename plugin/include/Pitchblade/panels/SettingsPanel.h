@@ -25,8 +25,19 @@ private:
     //Used a combobox to list specific user choices
     juce::ComboBox framerateDropDown;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> framerateAttachment;
+    
+    // Theme selector
+    juce::Label themeLabel;
+    juce::ComboBox themeDropDown;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> themeAttachment;
 
     juce::TextButton audioSettingsButton { "Audio Settings" };
+
+    // Monitor Device Controls (Standalone Only)
+    juce::Label monitorDeviceLabel;
+    juce::ComboBox monitorDeviceSelector;
+    juce::Label monitorGainLabel;
+    juce::Slider monitorGainSlider;
 
     //TextEditor to hold the license info
     juce::TextEditor licenseText;
@@ -41,4 +52,5 @@ public:
 
     void paint(juce::Graphics& g) override;
     void resized() override;
+    void refreshColors();
 };

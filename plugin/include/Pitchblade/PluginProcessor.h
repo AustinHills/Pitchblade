@@ -13,6 +13,7 @@
 #include <vector>
 #include <memory>
 #include <juce_audio_processors/juce_audio_processors.h>
+#include <JuceHeader.h> // Required for AudioDeviceManager and other utils
 //Austin
 #include "Pitchblade/effects/GainProcessor.h"       
 #include "Pitchblade/effects/CompressorProcessor.h" 
@@ -180,6 +181,45 @@ private:
     
     // JUCE helper that smooths out CPU usage calculation
     juce::AudioProcessLoadMeasurer loadMeasurer;
+
+    //==============================================================================
+    // Standalone Monitoring System
+    //==============================================================================
+    
+    // Internal callback class to handle the secondary device's audio callback
+    class MonitorOutputCallback : public juce::AudioIODeviceCallback {
+    public:
+        MonitorOutputCallback(AudioPluginAudioProcessor& p) : owner(p) {}
+
+        void audioDeviceIOCallbackWithContext(const float* const* inputChannelData,
+            int numInputChannels,
+            float* const* outputChannelData,
+            int numOutputChannels,
+            int numSamples,
+            const juce::AudioIODeviceCallbackContext& context) override;
+
+        void audioDeviceAboutToStart(juce::AudioIODevice* device) override {}
+        void audioDeviceStopped() override {}
+
+    private:
+        AudioPluginAudioProcessor& owner;
+    };
+
+    MonitorOutputCallback monitorCallback { *this };
+
+public:
+    // Standalone-only Monitor Device Manager
+    juce::AudioDeviceManager monitorDeviceManager;
+    
+    // Ring Buffer components
+    juce::AbstractFifo monitorFifo { 48000 }; // 1 second buffer approx
+    juce::AudioBuffer<float> monitorBuffer;
+    
+    std::atomic<float> monitorVolume { 1.0f };
+
+    // Method to set the monitor device by name
+    void setMonitorDevice(const juce::String& deviceName);
+
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioPluginAudioProcessor)
 };

@@ -180,11 +180,11 @@ public:
         modeButton.repaint();
     }
 
-	//for external bypass changes, changes button color if gobal bypassed
+    //for external bypass changes, changes button color if gobal bypassed
     void updateBypassVisual(bool state) {
         bypassed = state;
 
-        const auto bg = state ? juce::Colours::hotpink : Colors::panel;
+        const auto bg = state ? Colors::accent : Colors::panel;
         bypass.setColour(juce::TextButton::buttonColourId, bg);
         bypass.setColour(juce::TextButton::buttonOnColourId, bg);
         bypass.setColour(juce::TextButton::textColourOffId, Colors::buttonText);
@@ -391,12 +391,47 @@ public:
 
 	// update right mode visual
     void updateRightModeVisual() {
-        juce::Colour bg = juce::Colour(0xffae66ed); 
+        juce::Colour bg;
+        switch (chainModeId) {
+            case 3: bg = Colors::accentPurple; break; // Right Double
+            default: bg = juce::Colour(0xffae66ed); break; 
+        }
+    
         rightMode.setColour(juce::TextButton::buttonColourId, bg);
         rightMode.setColour(juce::TextButton::buttonOnColourId, bg);
         rightMode.setColour(juce::TextButton::textColourOffId, Colors::buttonText);
         rightMode.setColour(juce::TextButton::textColourOnId, Colors::buttonText);
         rightMode.repaint();
+    }
+
+    void refreshColors() {
+        // Refresh main button selection color
+        if (onEffectSelected) { button.setColour(juce::TextButton::buttonColourId, Colors::accent); }
+        else { button.setColour(juce::TextButton::buttonColourId, Colors::panel); }
+        
+        button.setColour(juce::TextButton::textColourOffId, Colors::buttonText);
+        button.setColour(juce::TextButton::textColourOnId, Colors::buttonText);
+
+        // Refresh bypass button
+        updateBypassVisual(bypassed);
+
+        // Refresh mode button
+        updateModeVisual();
+
+        // Refresh right side components if they exist
+        if (hasRight) {
+            if (onEffectSelected) { // Assuming right button shares selection logic or just default
+                 // Right button selection logic seems missing in original code, treating as default panel color for now unless logic added
+                 rightButton.setColour(juce::TextButton::buttonColourId, Colors::panel); 
+            }
+            rightButton.setColour(juce::TextButton::textColourOffId, Colors::buttonText);
+            rightButton.setColour(juce::TextButton::textColourOnId, Colors::buttonText);
+
+            updateSecondaryBypassVisual(rightBypassed);
+            updateRightModeVisual();
+        }
+        
+        repaint();
     }
 
     /////////////////////////////////////////////////////////////////////////////// callbacks
