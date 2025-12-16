@@ -17,6 +17,14 @@ if command -v apt-get >/dev/null; then
     # Update package list (optional, might need sudo)
     sudo apt-get update
     
+    # Determine available WebKit2Gtk version (4.1 is for Ubuntu 24.04+, 4.0 for older)
+    if apt-cache show libwebkit2gtk-4.1-dev >/dev/null 2>&1; then
+        WEBKIT_PKG="libwebkit2gtk-4.1-dev"
+    else
+        WEBKIT_PKG="libwebkit2gtk-4.0-dev"
+    fi
+    echo "Selected WebKit package: $WEBKIT_PKG"
+
     # Install dependencies
     # We use 'sudo' here, so the user might be prompted for a password.
     sudo apt-get install -y \
@@ -25,7 +33,7 @@ if command -v apt-get >/dev/null; then
         libcurl4-openssl-dev libfreetype6-dev \
         libx11-dev libxcomposite-dev libxcursor-dev \
         libxext-dev libxinerama-dev libxrandr-dev \
-        libxrender-dev libwebkit2gtk-4.0-dev \
+        libxrender-dev $WEBKIT_PKG \
         libglu1-mesa-dev mesa-common-dev \
         librubberband-dev pkg-config
 
