@@ -189,3 +189,30 @@ void EffectNode::mergeParentBuffers(AudioPluginAudioProcessor& proc, juce::Audio
         buffer.copyFrom(ch, 0, mergeBuffer, ch, 0, numSamples); // copy merged data to output buffer
     }
 }
+    // allows multiple outputs
+    void EffectNode::connectTo(std::shared_ptr<EffectNode> next) {
+        // avoid self-connection and null
+        if (!next || next.get() == this) { return; }
+
+        // avoid duplicate child links
+        if (std::find(children.begin(), children.end(), next) == children.end()) { 
+            children.push_back(next);
+        }
+        std::shared_ptr<EffectNode> self;   // shared ptr to this
+
+        try {   // only safe if shared_from_this() is valid
+            self = shared_from_this();
+        } catch (const std::bad_weak_ptr&) {
+            juce::Logger::outputDebugString(" connectTo(): error for " + effectName);
+            return;
+        } 
+
+        // avoid duplicate parent links
+        auto alreadyParent = std::any_of(next->parents.begin(), next->parents.end(),
+            [&](const std::weak_ptr<EffectNode>& w) {   // check if this is already a parent
+                auto p = w.lock();                      // try to get shared_ptr
+                return p && p.get() == this;            // compare raw pointers
+            });
+        if (!alreadyParent)
+            next->parents.push_back(self);  // in case shared_from_this() is called on an object not owned by a shared_ptr
+    }
