@@ -3,7 +3,7 @@
 # Pitchblade Linux Release Build Script
 # Builds the plugin in Release mode (RelWithDebInfo).
 
-set -e
+# set -e # Disabled to allow retry logic
 
 echo "=========================================="
 echo "Pitchblade Release Build (Linux)"
@@ -24,7 +24,13 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo $GENERATOR
 
 echo "Building Plugin..."
 # We build the 'Pitchblade' target (or Pitchblade_All if defined, usually just all is default)
-cmake --build build --config RelWithDebInfo
+if ! cmake --build build --config RelWithDebInfo; then
+    echo "=========================================="
+    echo "Build failed! This might be an Out-Of-Memory (OOM) error."
+    echo "Retrying with single-core (low memory mode)..."
+    echo "=========================================="
+    cmake --build build --config RelWithDebInfo -j 1
+fi
 
 echo "=========================================="
 echo "Release Build Complete!"
