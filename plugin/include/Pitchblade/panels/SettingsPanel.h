@@ -33,6 +33,12 @@ private:
 
     juce::TextButton audioSettingsButton { "Audio Settings" };
 
+    // Monitor Device Controls (Standalone Only)
+    juce::Label monitorDeviceLabel;
+    juce::ComboBox monitorDeviceSelector;
+    juce::Label monitorGainLabel;
+    juce::Slider monitorGainSlider;
+
     //TextEditor to hold the license info
     juce::TextEditor licenseText;
 
