@@ -17,7 +17,6 @@
 
 #pragma once
 #include <JuceHeader.h>
-#include "Pitchblade/PluginProcessor.h"
 #include <memory>
 #include <vector>
 
