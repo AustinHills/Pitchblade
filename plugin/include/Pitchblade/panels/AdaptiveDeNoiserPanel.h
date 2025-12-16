@@ -16,7 +16,7 @@ private:
     juce::Slider thresholdSlider;
 
     //Labels
-    juce::Label deNoiserLabel, reductionLabel, thresholdLabel;
+    juce::Label deNoiserLabel;
 
     juce::ValueTree localState;
 

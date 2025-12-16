@@ -52,11 +52,8 @@ private:
     juce::ToggleButton listenButton { "Listen" };
 
     juce::Label titleLabel;
-    juce::Label thresholdLabel, ratioLabel, attackLabel, releaseLabel;
-    juce::Label minFreqLabel, maxFreqLabel;
+    // Labels handled by sliders now
     
-    void place(juce::Rectangle<int> area, juce::Slider& slider, juce::Label& label);
-
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(BandPassCompressorPanel)
 };
 

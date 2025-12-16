@@ -229,5 +229,11 @@ void SettingsPanel::refreshColors() {
     licenseText.setColour(juce::TextEditor::backgroundColourId, juce::Colours::transparentBlack);
     licenseText.setColour(juce::TextEditor::textColourId, Colors::buttonText.withAlpha(0.8f));
 
+    // Monitor labels (Standalone only)
+    if (juce::JUCEApplication::isStandaloneApp()) {
+        monitorDeviceLabel.setColour(juce::Label::textColourId, Colors::buttonText);
+        monitorGainLabel.setColour(juce::Label::textColourId, Colors::buttonText);
+    }
+
     repaint();
 }

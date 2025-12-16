@@ -31,6 +31,12 @@ struct CustomLookAndFeel : public juce::LookAndFeel_V4
         setColour(juce::Slider::textBoxOutlineColourId, Colors::accent);  // value textbox 
         setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
         setColour(juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
+
+        // ComboBox
+        setColour(juce::ComboBox::textColourId, Colors::buttonText);
+        setColour(juce::ComboBox::backgroundColourId, Colors::button);
+        setColour(juce::ComboBox::arrowColourId, Colors::buttonText);
+        setColour(juce::ComboBox::outlineColourId, Colors::accent);
     }
 
     void drawPanelBackground(juce::Graphics& g, juce::Component& comp) { 
@@ -527,7 +533,7 @@ struct CustomLookAndFeel : public juce::LookAndFeel_V4
 
             //put dial name below black dial
             if (slider.getName().isNotEmpty())  {
-                g.setColour(juce::Colours::white);
+                g.setColour(Colors::buttonText);
                 //text
                 g.setFont(juce::Font(radius * 0.25f, juce::Font::bold));
                 //below dial
