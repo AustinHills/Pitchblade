@@ -300,7 +300,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::c
     params.push_back(std::make_unique<juce::AudioParameterInt>(
         "GLOBAL_FRAMERATE", "Global Framerate", 1, 4, 3));
 
-    //Theme: reyna
+    //Theme: austin
     params.push_back(std::make_unique<juce::AudioParameterInt>(
         "GLOBAL_THEME", "Theme", 0, 4, 0)); // 0: Dark, 1: Light, 2: Sunset, 3: Pink, 4: Green
 
