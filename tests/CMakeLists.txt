@@ -3,7 +3,6 @@ project(PitchbladeTests)
 
 
 # RubberBand configuration==============================================
-# RubberBand configuration==============================================
 if(NOT TARGET RubberBand)
     if(WIN32)
         set(RUBBERBAND_DIR ${CMAKE_SOURCE_DIR}/plugin/third-party/rubberband)
@@ -54,7 +53,7 @@ add_executable(runTests
     test_DeEsserProcessor.cpp
     test_DeNoiserProcessor.cpp
     test_SaturationProcessor.cpp
-    test_UI_DaisyChain.cpp
+    test_UI_Daisychain.cpp
     test_BandPassCompressorProcessor.cpp
     test_FormantShifter.cpp
     test_FormantDetector.cpp
