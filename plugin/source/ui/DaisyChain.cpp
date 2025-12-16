@@ -695,7 +695,7 @@ void DaisyChain::showAddMenu() {
 
 	// show menu async
     menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&addButton), [this](int result) {
-        addButton.setColour(juce::TextButton::buttonColourId, Colors::button);
+        addButton.removeColour(juce::TextButton::buttonColourId);
         if (result == 0) return;
         
         // Define Type string based on result
@@ -769,7 +769,7 @@ void DaisyChain::showDuplicateMenu() {
 
     // show menu async
     menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&duplicateButton), [this](int result) {
-        duplicateButton.setColour(juce::TextButton::buttonColourId, Colors::button);
+        duplicateButton.removeColour(juce::TextButton::buttonColourId);
 
         if (result == 0) return;
         const int index = result - 1;
@@ -814,7 +814,7 @@ void DaisyChain::showDeleteMenu() {
     deleteButton.setColour(juce::TextButton::buttonColourId, Colors::accent);
 
     menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&deleteButton), [this](int result) {
-        deleteButton.setColour(juce::TextButton::buttonColourId, Colors::button);
+        deleteButton.removeColour(juce::TextButton::buttonColourId);
         if (result == 0) return;
         
         const int index = result - 1;
@@ -1040,6 +1040,13 @@ void DaisyChain::showContextMenu(int index, bool isRightSide) {
 void DaisyChain::refreshColors() {
     scrollArea.getVerticalScrollBar().setColour(juce::ScrollBar::thumbColourId, juce::Colours::grey);
     scrollArea.getVerticalScrollBar().setColour(juce::ScrollBar::trackColourId, Colors::panel);
+    
+    // Reset buttons to use LookAndFeel colors
+    addButton.removeColour(juce::TextButton::buttonColourId);
+    duplicateButton.removeColour(juce::TextButton::buttonColourId);
+    deleteButton.removeColour(juce::TextButton::buttonColourId);
+    undoButton.removeColour(juce::TextButton::buttonColourId);
+    redoButton.removeColour(juce::TextButton::buttonColourId);
     
     for (auto* item : items) {
         if (item != nullptr) {
