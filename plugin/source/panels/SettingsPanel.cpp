@@ -28,7 +28,7 @@ SettingsPanel::SettingsPanel(AudioPluginAudioProcessor& p) : processor(p) {
     addAndMakeVisible(themeLabel);
 
     //Theme Menu
-    themeDropDown.addItemList(juce::StringArray{"Dark", "Light", "Sunset", "Pink", "Green"}, 1);
+    themeDropDown.addItemList(juce::StringArray{"Dark", "Light", "Sunset", "Bubblegum", "Mint"}, 1);
     addAndMakeVisible(themeDropDown);
     
     themeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(processor.apvts, "GLOBAL_THEME", themeDropDown);

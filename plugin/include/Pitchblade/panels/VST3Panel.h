@@ -2,6 +2,12 @@
 //This header defines the VST3Node for DSP/Hosting, the VST3Panel for UI, and the Visualizer
 
 #pragma once
+#include <atomic>
+#include <mutex>
+#include <memory>
+#include <vector>
+#include <functional>
+#include <algorithm>
 #include <JuceHeader.h>
 #include "Pitchblade/PluginProcessor.h"
 #include "Pitchblade/panels/EffectNode.h"

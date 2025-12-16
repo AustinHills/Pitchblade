@@ -157,7 +157,7 @@ void EqualizerVisualizer::YAxisLabelOverlay::paint(juce::Graphics& g)
     // Graph vertical bounds inside the child visualizer are reduced by 5px top/bottom
     const int graphTop = 5;
     const int graphBottom = (bounds.getHeight() - labelHeight) - 5;
-    const int graphHeight = juce::jmax(0, graphBottom - graphTop);
+    // const int graphHeight = juce::jmax(0, graphBottom - graphTop); // Unused
 
     // Mask the original labels area
     g.setColour(Colors::panel);
