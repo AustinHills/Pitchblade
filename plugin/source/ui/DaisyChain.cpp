@@ -404,8 +404,8 @@ void DaisyChain::resized() {
     const int scrollBarWidth = 6;
     scrollArea.setScrollBarsShown(true, false);
     scrollArea.setScrollBarThickness(scrollBarWidth);
-    scrollArea.getVerticalScrollBar().setColour(juce::ScrollBar::thumbColourId, juce::Colours::grey);
-    scrollArea.getVerticalScrollBar().setColour(juce::ScrollBar::trackColourId, Colors::panel);
+    
+    refreshColors();
 
     scrollArea.setViewedComponent(&effectsContainer, false);
 
@@ -1035,4 +1035,17 @@ void DaisyChain::showContextMenu(int index, bool isRightSide) {
     });
 
     menu.showMenuAsync(juce::PopupMenu::Options());
+}
+
+void DaisyChain::refreshColors() {
+    scrollArea.getVerticalScrollBar().setColour(juce::ScrollBar::thumbColourId, juce::Colours::grey);
+    scrollArea.getVerticalScrollBar().setColour(juce::ScrollBar::trackColourId, Colors::panel);
+    
+    for (auto* item : items) {
+        if (item != nullptr) {
+            item->refreshColors();
+        }
+    }
+
+    repaint();
 }

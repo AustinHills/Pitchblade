@@ -29,6 +29,7 @@ public:
 
     void paint(juce::Graphics& g) override;
     void resized() override;
+    void refreshColors();
 
     std::function<void()> onPresetActionFinished; // callback after preset action
 

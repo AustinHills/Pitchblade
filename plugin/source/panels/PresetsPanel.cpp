@@ -28,6 +28,12 @@ PresetsPanel::PresetsPanel(AudioPluginAudioProcessor& proc) : processor(proc) {
         statusLabel.setText("", juce::dontSendNotification); 
         });
 
+    refreshColors();
+}
+
+void PresetsPanel::refreshColors() {
+    statusLabel.setColour(juce::Label::textColourId, Colors::buttonText);
+    repaint();
 }
 
 // paint and layout
