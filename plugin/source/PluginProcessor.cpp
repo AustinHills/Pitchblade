@@ -349,10 +349,22 @@ void AudioPluginAudioProcessor::loadPresetFromFile(const juce::File& file) {
     if (xml->hasTagName("PitchbladePreset")) {
         // Load the whole tree. The listeners will fire and rebuild everything.
         // We use CopyProperties to preserve the root, but replace children.
-        juce::ValueTree newState = juce::ValueTree::fromXml(*xml);
+        juce::ValueTree loadedState = juce::ValueTree::fromXml(*xml);
         
-        if (newState.isValid()) {
-            apvts.replaceState(newState);
+        if (loadedState.isValid()) {
+            // [FIX] Force the root tag to be "Parameters" so it matches what the constructor expects.
+            // This ensures logic in setStateInformation (which checks xml->hasTagName(apvts.state.getType()))
+            // passes correctly on next restart.
+            if (loadedState.getType().toString() != "Parameters") {
+                juce::ValueTree corrected("Parameters");
+                corrected.copyPropertiesFrom(loadedState, nullptr);
+                for (auto child : loadedState) {
+                    corrected.addChild(child.createCopy(), -1, nullptr);
+                }
+                loadedState = corrected;
+            }
+
+            apvts.replaceState(loadedState);
             
             // Restore global settings explicitly after state replacement
             // This ensures the parameter value is forcefully set to the stored value
