@@ -583,6 +583,12 @@ juce::AudioProcessorEditor* AudioPluginAudioProcessor::createEditor() {
 //==============================================================================
 // State saving/loading - reyna
 void AudioPluginAudioProcessor::getStateInformation (juce::MemoryBlock& destData) {
+    // [FIX] Ensure all VST3/External nodes write their latest state blob to the Tree
+    std::lock_guard<std::recursive_mutex> lock(audioMutex);
+    for (auto& node : effectNodes) {
+        if (node) node->flushStateToValueTree();
+    }
+
 	auto xml = apvts.copyState().createXml();   // get ValueTree as XML
 	copyXmlToBinary(*xml, destData);            // copy to binary blob
 }
