@@ -1064,9 +1064,35 @@ void AudioPluginAudioProcessor::downloadAndInstall() {
 
         juce::URL url(updateUrl);
         
-        // Download (blocking in thread)
-        if (url.downloadToFile(installerExec)) {
+        // Use custom options to ensure Redirects (302) are followed
+        // GitHub Releases ALWAYS redirect to AWS/Other mirrors.
+        auto options = juce::URL::InputStreamOptions(juce::URL::ParameterHandling::inAddress)
+            .withConnectionTimeoutMs(15000)
+            .withNumRedirectsToFollow(5)
+            .withHttpRequestCmd("GET");
+
+        std::unique_ptr<juce::InputStream> in = url.createInputStream(options);
+        
+        // Download (Manual Stream)
+        if (in != nullptr) {
+            juce::FileOutputStream out(installerExec);
+            if (!out.openedOk()) {
+                 // File Access Error
+                 return; 
+            }
+
+            out.writeFromInputStream(*in, -1);
+            out.flush(); // Ensure written
             
+            // Validate Download (GitHub returns 404 HTML if file not found)
+            if (installerExec.getSize() < 1024 * 50) { // < 50KB is likely an error page
+                 juce::MessageManager::callAsync([](){
+                     juce::NativeMessageBox::showMessageBoxAsync(
+                         juce::AlertWindow::WarningIcon, "Update Error", "Downloaded file is too small. Check the URL in version.json.");
+                 });
+                 return;
+            }
+
             // Execute on Message Thread (or just here, check safety)
             // startAsProcess is safe from any thread usually, but quitting app should be on Message Thread
             juce::MessageManager::callAsync([installerExec]() {
@@ -1076,6 +1102,10 @@ void AudioPluginAudioProcessor::downloadAndInstall() {
                  if (installerExec.startAsProcess("/S /R")) {
                      // Quit immediately to unlock files for overwriting
                      juce::JUCEApplication::quit();
+                 } else {
+                     // Launch Failed
+                     juce::NativeMessageBox::showMessageBoxAsync(
+                         juce::AlertWindow::WarningIcon, "Update Error", "Could not launch the installer.");
                  }
             });
         } 
@@ -1084,7 +1114,7 @@ void AudioPluginAudioProcessor::downloadAndInstall() {
             // For MVP, silent fail or log.
             juce::MessageManager::callAsync([](){
                  juce::NativeMessageBox::showMessageBoxAsync(
-                     juce::AlertWindow::WarningIcon, "Update Failed", "Could not download the update installer.");
+                     juce::AlertWindow::WarningIcon, "Update Failed", "Could not download the update installer (Connection Error).");
             });
         }
     }).detach();

@@ -80,6 +80,8 @@ Function .onInit
         # Flag not present
         StrCpy $DO_RESTART "false"
     ${Else}
+        # Give the calling application time to close completely
+        Sleep 2000
         StrCpy $DO_RESTART "true"
     ${EndIf}
 FunctionEnd
@@ -101,6 +103,7 @@ Section "Standalone Application" SecStandalone
     
     # Copy the Standalone Executable
     File "build\plugin\Pitchblade_artefacts\RelWithDebInfo\Standalone\Pitchblade.exe"
+    File "build\plugin\Pitchblade_artefacts\RelWithDebInfo\Standalone\Pitchblade.pdb"
     
     # Create Uninstaller
     WriteUninstaller "$INSTDIR\uninstall.exe"
@@ -164,6 +167,7 @@ FunctionEnd
 Section "Uninstall"
     # Remove Standalone
     Delete "$INSTDIR\Pitchblade.exe"
+    Delete "$INSTDIR\Pitchblade.pdb"
     Delete "$INSTDIR\uninstall.exe"
     RMDir "$INSTDIR" 
     
