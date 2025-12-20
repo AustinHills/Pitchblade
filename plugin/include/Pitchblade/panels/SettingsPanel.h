@@ -31,6 +31,10 @@ private:
     juce::ComboBox themeDropDown;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> themeAttachment;
 
+    // Update Check Toggle
+    juce::ToggleButton updateCheckToggle;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> updateCheckAttachment;
+
     juce::TextButton audioSettingsButton { "Audio Settings" };
 
     // Monitor Device Controls (Standalone Only)

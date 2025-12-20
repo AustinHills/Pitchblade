@@ -32,6 +32,14 @@ SettingsPanel::SettingsPanel(AudioPluginAudioProcessor& p) : processor(p) {
     addAndMakeVisible(themeDropDown);
     
     themeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(processor.apvts, "GLOBAL_THEME", themeDropDown);
+    
+    // Update Toggle
+    addAndMakeVisible(updateCheckToggle);
+    updateCheckToggle.setButtonText("Check for updates on startup");
+    updateCheckToggle.setColour(juce::ToggleButton::textColourId, Colors::buttonText);
+    
+    updateCheckAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
+        processor.apvts, "GLOBAL_CHECK_UPDATES", updateCheckToggle);
 
     //Configure the Audio Settings button
     addAndMakeVisible(audioSettingsButton);
@@ -212,6 +220,10 @@ void SettingsPanel::resized(){
     themeLabel.setBounds(themeArea.removeFromLeft(themeArea.getWidth()/3));
     themeArea.removeFromLeft(10);
     themeDropDown.setBounds(themeArea);
+    
+    // Update Toggle
+    auto updateArea = area.removeFromTop(40).reduced(20, 0);
+    updateCheckToggle.setBounds(updateArea);    
 
     // License text takes up some bottom room
     licenseText.setBounds(area.removeFromBottom(100));
@@ -220,6 +232,8 @@ void SettingsPanel::resized(){
 void SettingsPanel::refreshColors() {
     framerateLabel.setColour(juce::Label::textColourId, Colors::buttonText);
     themeLabel.setColour(juce::Label::textColourId, Colors::buttonText);
+    updateCheckToggle.setColour(juce::ToggleButton::textColourId, Colors::buttonText);
+    updateCheckToggle.setColour(juce::ToggleButton::tickColourId, Colors::buttonText);
     
     // Explicitly update button colors as they might be cached
     audioSettingsButton.setColour(juce::TextButton::buttonColourId, Colors::button);

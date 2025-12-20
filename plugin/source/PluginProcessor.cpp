@@ -22,8 +22,11 @@
 #include <csignal>
 #include <exception>
 
+#include <exception>
+
 #include <chrono>
 #include <iostream>
+#include <thread>
 
 #if JUCE_WINDOWS
  #include <windows.h>
@@ -304,6 +307,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::c
     params.push_back(std::make_unique<juce::AudioParameterInt>(
         "GLOBAL_THEME", "Theme", 0, 4, 0)); // 0: Dark, 1: Light, 2: Sunset, 3: Pink, 4: Green
 
+    // Update Check: austin
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        "GLOBAL_CHECK_UPDATES", "Check for Updates", true));
+
     return { params.begin(), params.end() };
 }
 
@@ -482,6 +489,17 @@ void AudioPluginAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
 
     // Reset the load measurer
     loadMeasurer.reset(sampleRate, samplesPerBlock);
+
+    // [AUTO-UPDATE] Check on startup (Standalone only)
+    if (juce::JUCEApplication::isStandaloneApp() && !hasCheckedForUpdate) {
+        hasCheckedForUpdate = true;
+        
+        auto* updateParam = apvts.getParameter("GLOBAL_CHECK_UPDATES");
+        // Update if param missing (default true) OR if param > 0.5
+        if (!updateParam || updateParam->getValue() > 0.5f) {
+            checkForUpdates();
+        }
+    }
 }
 
 void AudioPluginAudioProcessor::releaseResources() {
@@ -939,4 +957,135 @@ void AudioPluginAudioProcessor::setMonitorDevice(const juce::String& deviceName)
     
     // reset fifo just in case
     monitorFifo.reset();
+}
+
+//==============================================================================
+// Auto-Update Implementation
+//==============================================================================
+
+void AudioPluginAudioProcessor::checkForUpdates() {
+    // Run content fetch on a background thread so we don't block audio/UI
+    std::thread([this]() {
+        // Raw URL to the version.json file on main branch
+        juce::URL url("https://raw.githubusercontent.com/AustinHills/Pitchblade/main/version.json");
+        
+        // Fast timeout (3s) to avoid annoying delays if offline
+        auto options = juce::URL::InputStreamOptions(juce::URL::ParameterHandling::inAddress)
+            .withConnectionTimeoutMs(3000)
+            .withNumRedirectsToFollow(5)
+            .withHttpRequestCmd("GET");
+
+        // Attempt read
+        auto jsonString = url.readEntireTextStream(false);
+        
+        // Return to Message Thread to process result
+        if (jsonString.isNotEmpty()) {
+            juce::MessageManager::callAsync([this, jsonString]() {
+                checkVersionJSON(jsonString);
+            });
+        }
+    }).detach();
+}
+
+void AudioPluginAudioProcessor::checkVersionJSON(const juce::String& jsonString) {
+    auto json = juce::JSON::parse(jsonString);
+    if (json.isVoid()) return;
+
+    // Get Versions
+    juce::String remoteVer = json["version"];
+    juce::String currentVer = JucePlugin_VersionString;
+
+    // Basic comparison: If strings differ, assume update.
+    // Ideally use semantic version comparison, but this works for "New Release" notification.
+    if (remoteVer.isNotEmpty() && remoteVer != currentVer) {
+        
+        // Store the download link
+        updateUrl = json["url"].toString();
+        if (updateUrl.isEmpty()) return;
+
+        // Custom Alert Window for "Don't show again" checkbox
+        auto* window = new juce::AlertWindow(
+            "Update Available",
+            "A new version of Pitchblade (" + remoteVer + ") is available. Would you like to update now?",
+            juce::AlertWindow::InfoIcon
+        );
+
+        window->addButton("Update Now", 1);
+        window->addButton("Later", 0);
+        
+        // The toggle that links to our parameter
+        auto* toggle = new juce::ToggleButton("Check for updates on startup");
+        toggle->setToggleState(true, juce::dontSendNotification);
+        toggle->setColour(juce::ToggleButton::textColourId, juce::Colours::white);
+        
+        // Add as custom component (window takes ownership)
+        toggle->setSize(300, 30);
+        window->addCustomComponent(toggle);
+
+        // Async callback
+        window->enterModalState(true, juce::ModalCallbackFunction::create(
+            [this, window, toggle](int result) {
+                // 1. Update Preference based on checkbox
+                // Logic: Checkbox says "Check for updates". 
+                // If unchecked -> Disable. If checked -> Enable (already enabled).
+                bool checkOnStartup = toggle->getToggleState();
+                
+                auto* param = apvts.getParameter("GLOBAL_CHECK_UPDATES");
+                if (param) {
+                    // Normalize: true=1.0, false=0.0
+                    param->setValueNotifyingHost(checkOnStartup ? 1.0f : 0.0f);
+                }
+
+                // 2. Handle Button Logic
+                if (result == 1) {
+                    // Yes -> Download
+                    downloadAndInstall();
+                }
+
+                // Clean up window
+                delete window;
+            }
+        ));
+    }
+}
+
+void AudioPluginAudioProcessor::downloadAndInstall() {
+    if (updateUrl.isEmpty()) return;
+
+    // Background thread for download
+    std::thread([this]() {
+        juce::File tempDir = juce::File::getSpecialLocation(juce::File::tempDirectory);
+        
+        // Fixed name for the installer
+        juce::File installerExec = tempDir.getChildFile("Pitchblade_Update_Installer.exe");
+
+        // Delete old artifacts
+        if (installerExec.exists()) installerExec.deleteFile();
+
+        juce::URL url(updateUrl);
+        
+        // Download (blocking in thread)
+        if (url.downloadToFile(installerExec)) {
+            
+            // Execute on Message Thread (or just here, check safety)
+            // startAsProcess is safe from any thread usually, but quitting app should be on Message Thread
+            juce::MessageManager::callAsync([installerExec]() {
+                 // Run Installer:
+                 // /S = Silent Mode
+                 // /R = Restart App (Custom flag we added to installer.nsi)
+                 if (installerExec.startAsProcess("/S /R")) {
+                     // Quit immediately to unlock files for overwriting
+                     juce::JUCEApplication::quit();
+                 }
+            });
+        } 
+        else {
+            // Error handling (Optional: Show popup? Silent fail?)
+            // For MVP, silent fail or log.
+            juce::MessageManager::callAsync([](){
+                 juce::NativeMessageBox::showMessageBoxAsync(
+                     juce::AlertWindow::WarningIcon, "Update Failed", "Could not download the update installer.");
+            });
+        }
+    }).detach();
 }
