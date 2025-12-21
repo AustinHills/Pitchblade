@@ -220,6 +220,15 @@ public:
     // Method to set the monitor device by name
     void setMonitorDevice(const juce::String& deviceName);
 
+    //==============================================================================
+    // Auto-Update Mechanism
+    //==============================================================================
+    void checkForUpdates();
+    void checkVersionJSON(const juce::String& jsonString);
+    void downloadAndInstall();
+    
+    juce::String updateUrl; // Stores the URL of the found installer
+    bool hasCheckedForUpdate = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioPluginAudioProcessor)
 };

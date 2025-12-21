@@ -1,6 +1,7 @@
 # --- Pitchblade NSIS Installer Script ---
 !include "MUI2.nsh"
 !include "LogicLib.nsh"
+!include "FileFunc.nsh"
 
 # 1. General Configuration
 Name "Pitchblade"
@@ -11,6 +12,7 @@ RequestExecutionLevel admin
 # Variables
 Var VST3_DIR
 Var STARTMENU_FOLDER
+Var DO_RESTART
 
 # 2. MUI Settings
 !define MUI_ICON "plugin\assets\pb_logo.ico"
@@ -53,9 +55,41 @@ Var STARTMENU_FOLDER
 !insertmacro MUI_LANGUAGE "English"
 
 # 5. Initialization
+# 5. Initialization
 Function .onInit
     # Initialize variables
     StrCpy $VST3_DIR "$COMMONFILES64\VST3"
+
+    # 1. Check for previous Standalone InstallDir
+    ReadRegStr $0 HKCU "Software\Pitchblade" "InstallDir"
+    ${If} $0 != ""
+        StrCpy $INSTDIR $0
+    ${EndIf}
+
+    # 2. Check for previous VST3 InstallDir
+    ReadRegStr $0 HKCU "Software\Pitchblade" "VST3Dir"
+    ${If} $0 != ""
+        StrCpy $VST3_DIR $0
+    ${EndIf}
+
+    # 3. Check for specific restart flag /R
+    # Used by auto-updater to restart app after silent install
+    ${GetParameters} $R0
+    ${GetOptions} $R0 "/R" $R1
+    ${If} ${Errors}
+        # Flag not present
+        StrCpy $DO_RESTART "false"
+    ${Else}
+        # Give the calling application time to close completely
+        Sleep 2000
+        StrCpy $DO_RESTART "true"
+    ${EndIf}
+FunctionEnd
+
+Function .onInstSuccess
+    ${If} $DO_RESTART == "true"
+        Exec "$INSTDIR\Pitchblade.exe"
+    ${EndIf}
 FunctionEnd
 
 # 7. Installer Sections
@@ -64,8 +98,12 @@ FunctionEnd
 Section "Standalone Application" SecStandalone
     SetOutPath "$INSTDIR"
     
+    # [PERSISTENCE] Save the installation path for future upgrades
+    WriteRegStr HKCU "Software\Pitchblade" "InstallDir" $INSTDIR
+    
     # Copy the Standalone Executable
     File "build\plugin\Pitchblade_artefacts\RelWithDebInfo\Standalone\Pitchblade.exe"
+    File "build\plugin\Pitchblade_artefacts\RelWithDebInfo\Standalone\Pitchblade.pdb"
     
     # Create Uninstaller
     WriteUninstaller "$INSTDIR\uninstall.exe"
@@ -81,6 +119,9 @@ SectionEnd
 # --- VST3 Plugin ---
 Section "VST3 Plugin" SecVST3
     SetOutPath "$VST3_DIR"
+    
+    # [PERSISTENCE] Save the installation path for future upgrades
+    WriteRegStr HKCU "Software\Pitchblade" "VST3Dir" $VST3_DIR
     
     # Clean old bundle in the TARGET directory (custom or default)
     # Use logic to avoid deleting common files if the path is weird, but generally standard
@@ -126,6 +167,7 @@ FunctionEnd
 Section "Uninstall"
     # Remove Standalone
     Delete "$INSTDIR\Pitchblade.exe"
+    Delete "$INSTDIR\Pitchblade.pdb"
     Delete "$INSTDIR\uninstall.exe"
     RMDir "$INSTDIR" 
     
