@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.22)
 
 # Project name
-project(Pitchblade VERSION 5.0.1)
+project(Pitchblade VERSION 1.1.0)
 
 # RubberBand configuration==============================================
 if(WIN32)
