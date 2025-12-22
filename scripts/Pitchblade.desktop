@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Pitchblade
+Comment=Real-time Voice FX Chain
+Exec=/usr/local/bin/Pitchblade
+Icon=pitchblade
+Terminal=false
+Categories=AudioVideo;Audio;
+StartupNotify=true

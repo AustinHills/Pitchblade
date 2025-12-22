@@ -15,14 +15,38 @@ Pitchblade includes several processing modules tailored for vocals:
 * **BandPass Compressor:** Compresses audio only within a specific frequency range.
 * **Noise Gate:** Eliminates sounds below a certain level.
 * **De-Esser:** Reduces harsh sibilance.
-* **De-Noiser:** Learns what sounds are present in the background to reduce them. Recommended to be used with the Noise Gate for full noise reduction.
+* **De-Noiser:** A spectral subtraction de-noiser for removing consistent background noise.
+* **Adaptive De-Noiser:** A smarter de-noiser that learns and adapts to changing background noise profiles.
 * **Saturation:** Adds harmonic saturation and warmth to the signal.
 * **Equalizer:** Increases or reduces amplitude at specific frequencies to shape the sound of a voice.
 * **VST3 Hosting:** Allows loading external VST3 plugins anywhere in the signal chain.
 
 Pitchblade also includes a few quality-of-life features to make the user experience better:
-* **Visualizers:** Each panel has its own specialized visualizer based on two visualizer template classes.
+* **Visualizers:** Each panel has its own specialized visualizer.
+* **Themes:** Select from 5 unique color themes (Dark, Light, Sunset, etc.) to customize the look.
+* **Framerate Limit:** Adjustable UI framerate (up to 60fps) to save battery or maximize smoothness.
 * **Preset Management:** Save and load custom effect chains.
+* **Pitchblade Cable (Linux):** A built-in virtual audio device for easily routing output to Discord or other apps.
+
+## Installation (Binary Releases)
+
+For users who want to simply run Pitchblade without building it.
+
+### Windows
+1.  Download `Pitchblade_Installer.exe`.
+2.  Run the installer. This will install the Standalone App and VST3 Plugin automatically.
+
+### Linux
+1.  Download `Pitchblade_Linux.tar.gz`.
+2.  Extract the archive.
+3.  Open the folder and run the installer script:
+    ```bash
+    ./install_linux.sh
+    ```
+    *   Installs Standalone to `~/.local/bin/Pitchblade`
+    *   Installs VST3 to `~/.vst3/Pitchblade.vst3`
+    *   Adds "Pitchblade" to your applications menu.
+4.  **Uninstall**: Run `./uninstall_linux.sh` to remove all files.
 
 ## Prerequisites
 

@@ -154,6 +154,16 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
         #if !JUCE_WINDOWS
             signal(SIGSEGV, StandardSignalHandler);
         #endif
+
+        // [LINUX] Auto-Create Pitchblade Virtual Cable
+        #if JUCE_LINUX
+        if (system("pactl list short sinks | grep -q PitchbladeCable") != 0)
+        {
+             // Create if it doesn't exist
+             // We largely ignore the return code; if it fails, it fails.
+             system("pactl load-module module-null-sink sink_name=PitchbladeCable sink_properties=device.description=\"Pitchblade_Cable\"");
+        }
+        #endif
     }
 
 	    // check if effectNodes tree exists
@@ -179,6 +189,11 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
 AudioPluginAudioProcessor::~AudioPluginAudioProcessor(){ 
     if (juce::JUCEApplication::isStandaloneApp()) {
         monitorDeviceManager.removeAudioCallback(&monitorCallback);
+        
+        // [LINUX] Cleanup Pitchblade Virtual Cable
+        #if JUCE_LINUX
+        system("pactl list short modules | grep \"sink_name=PitchbladeCable\" | cut -f1 | xargs -r pactl unload-module");
+        #endif
     }
     suspendProcessing(true); 
 }
@@ -999,8 +1014,21 @@ void AudioPluginAudioProcessor::checkVersionJSON(const juce::String& jsonString)
     // Ideally use semantic version comparison, but this works for "New Release" notification.
     if (remoteVer.isNotEmpty() && remoteVer != currentVer) {
         
-        // Store the download link
-        updateUrl = json["url"].toString();
+        // Store the download link (Platform Specific)
+        #if JUCE_WINDOWS
+            if (json.hasProperty("url_windows")) 
+                updateUrl = json["url_windows"].toString();
+            else
+                updateUrl = json["url"].toString(); // Fallback
+        #elif JUCE_LINUX
+            if (json.hasProperty("url_linux")) 
+                updateUrl = json["url_linux"].toString();
+            else
+                updateUrl = json["url"].toString(); // Fallback
+        #else
+            updateUrl = json["url"].toString();
+        #endif
+
         if (updateUrl.isEmpty()) return;
 
         // Custom Alert Window for "Don't show again" checkbox
@@ -1055,17 +1083,22 @@ void AudioPluginAudioProcessor::downloadAndInstall() {
     // Background thread for download
     std::thread([this]() {
         juce::File tempDir = juce::File::getSpecialLocation(juce::File::tempDirectory);
+        juce::File userDownloads = juce::File::getSpecialLocation(juce::File::userHomeDirectory).getChildFile("Downloads");
         
-        // Fixed name for the installer
-        juce::File installerExec = tempDir.getChildFile("Pitchblade_Update_Installer.exe");
+        // [WINDOWS] Executable Installer
+        #if JUCE_WINDOWS
+            juce::File installerFile = tempDir.getChildFile("Pitchblade_Update_Installer.exe");
+        // [LINUX] Tarball
+        #else
+            juce::File installerFile = userDownloads.getChildFile("Pitchblade_Linux.tar.gz");
+        #endif
 
         // Delete old artifacts
-        if (installerExec.exists()) installerExec.deleteFile();
+        if (installerFile.exists()) installerFile.deleteFile();
 
         juce::URL url(updateUrl);
         
-        // Use custom options to ensure Redirects (302) are followed
-        // GitHub Releases ALWAYS redirect to AWS/Other mirrors.
+        // Custom Options (Redirects)
         auto options = juce::URL::InputStreamOptions(juce::URL::ParameterHandling::inAddress)
             .withConnectionTimeoutMs(15000)
             .withNumRedirectsToFollow(5)
@@ -1073,19 +1106,16 @@ void AudioPluginAudioProcessor::downloadAndInstall() {
 
         std::unique_ptr<juce::InputStream> in = url.createInputStream(options);
         
-        // Download (Manual Stream)
+        // Download
         if (in != nullptr) {
-            juce::FileOutputStream out(installerExec);
-            if (!out.openedOk()) {
-                 // File Access Error
-                 return; 
-            }
+            juce::FileOutputStream out(installerFile);
+            if (!out.openedOk()) { return; }
 
             out.writeFromInputStream(*in, -1);
-            out.flush(); // Ensure written
+            out.flush(); 
             
-            // Validate Download (GitHub returns 404 HTML if file not found)
-            if (installerExec.getSize() < 1024 * 50) { // < 50KB is likely an error page
+            // Validation
+            if (installerFile.getSize() < 1024 * 50) { 
                  juce::MessageManager::callAsync([](){
                      juce::NativeMessageBox::showMessageBoxAsync(
                          juce::AlertWindow::WarningIcon, "Update Error", "Downloaded file is too small. Check the URL in version.json.");
@@ -1093,28 +1123,36 @@ void AudioPluginAudioProcessor::downloadAndInstall() {
                  return;
             }
 
-            // Execute on Message Thread (or just here, check safety)
-            // startAsProcess is safe from any thread usually, but quitting app should be on Message Thread
-            juce::MessageManager::callAsync([installerExec]() {
-                 // Run Installer:
-                 // /S = Silent Mode
-                 // /R = Restart App (Custom flag we added to installer.nsi)
-                 if (installerExec.startAsProcess("/S /R")) {
-                     // Quit immediately to unlock files for overwriting
-                     juce::JUCEApplication::quit();
-                 } else {
-                     // Launch Failed
-                     juce::NativeMessageBox::showMessageBoxAsync(
-                         juce::AlertWindow::WarningIcon, "Update Error", "Could not launch the installer.");
-                 }
+            // Execution / Notification
+            juce::MessageManager::callAsync([installerFile]() {
+                 #if JUCE_WINDOWS
+                     // Windows: Run Silent Installer
+                     if (installerFile.startAsProcess("/S /R")) {
+                         juce::JUCEApplication::quit();
+                     } else {
+                         juce::NativeMessageBox::showMessageBoxAsync(
+                             juce::AlertWindow::WarningIcon, "Update Error", "Could not launch the installer.");
+                     }
+                 #else
+                     // Linux: Notify and Reveal
+                     juce::AlertWindow::showMessageBoxAsync(
+                         juce::AlertWindow::InfoIcon,
+                         "Update Downloaded",
+                         "The update has been downloaded to your Downloads folder.\n\n"
+                         "Please close Pitchblade and run the 'install_linux.sh' script inside the archive.",
+                         "Open Folder",
+                         nullptr,
+                         juce::ModalCallbackFunction::create([installerFile](int result) {
+                             installerFile.getParentDirectory().startAsProcess();
+                         })
+                     );
+                 #endif
             });
         } 
         else {
-            // Error handling (Optional: Show popup? Silent fail?)
-            // For MVP, silent fail or log.
             juce::MessageManager::callAsync([](){
                  juce::NativeMessageBox::showMessageBoxAsync(
-                     juce::AlertWindow::WarningIcon, "Update Failed", "Could not download the update installer (Connection Error).");
+                     juce::AlertWindow::WarningIcon, "Update Failed", "Could not download the update (Connection Error).");
             });
         }
     }).detach();
