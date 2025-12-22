@@ -687,6 +687,7 @@ void DaisyChain::showAddMenu() {
     menu.addItem(10, "Pitch",    !pitchExists);
     menu.addItem(11, "Equalizer");
     menu.addItem(12, "Saturation");
+    menu.addItem(13, "De-Clicker");
     menu.addItem(99, "VST3");
 
 	// set look and feel
@@ -714,6 +715,7 @@ void DaisyChain::showAddMenu() {
             case 10: type="PitchNode"; baseName="Pitch"; break;
             case 11: type="EqualizerNode"; baseName="Equalizer"; break;
             case 12: type="SaturationNode"; baseName="Saturation"; break;
+            case 13: type="DeClickerNode"; baseName="De-Clicker"; break;
             case 99: type="VST3Node"; baseName="VST3"; break;
         }
 

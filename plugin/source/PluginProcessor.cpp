@@ -16,6 +16,7 @@
 //hayley
 #include "Pitchblade/panels/PitchPanel.h"
 #include "Pitchblade/panels/AdaptiveDeNoiserPanel.h"
+#include "Pitchblade/panels/DeClickerPanel.h"
 
 #include "Pitchblade/panels/VST3Panel.h"
 
@@ -249,6 +250,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::c
         "DENOISER_LEARN", "DeNoiser Learn", false));
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "DENOISER_THRESHOLD", "DeNoiser Threshold", juce::NormalisableRange<float>(-100.0f, 0.0f, 0.1f), -100.0f));
+
+    // De-Clicker : austin
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "DECLICKER_SENSITIVITY", "DeClicker Sensitivity", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.5f));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(
+        "DECLICKER_HISTORY", "DeClicker History", 1, 50, 5));
 
     //Saturation : austin
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
@@ -707,6 +714,7 @@ std::shared_ptr<EffectNode> AudioPluginAudioProcessor::createNodeFromState(const
     else if (type == "DeEsserNode")     node = std::make_shared<DeEsserNode>(*this, state);
     else if (type == "DeNoiserNode")    node = std::make_shared<DeNoiserNode>(*this, state);
     else if (type == "AdaptiveDeNoiserNode")    node = std::make_shared<AdaptiveDeNoiserNode>(*this, state);
+    else if (type == "DeClickerNode")           node = std::make_shared<DeClickerNode>(*this, state);
     else if (type == "SaturationNode")          node = std::make_shared<SaturationNode>(*this, state);
     else if (type == "AutoGainNode")            node = std::make_shared<AutoGainNode>(*this, state);
     else if (type == "EqualizerNode")   node = std::make_shared<EqualizerNode>(*this, state);  

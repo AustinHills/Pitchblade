@@ -64,6 +64,7 @@ add_executable(runTests
     test_Integration_Equalizer.cpp
     test_Integration_PitchCorrector.cpp
     test_Integration_VisualizerPanel.cpp
+    test_DeClickerProcessor.cpp
  )
 
 # This forces CMake to build the 'Pitchblade' target (and generate JuceHeader.h)
