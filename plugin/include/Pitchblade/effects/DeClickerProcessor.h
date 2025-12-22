@@ -11,7 +11,7 @@ class DeClickerProcessor {
 private:
     // User parameters
     int historyLength = 5;      // How many frames back to look (1-50)
-    int lookAheadDepth = 2;     // How many frames forward to look (Latency)
+    int lookAheadDepth = 4;     // How many frames forward to look (Latency)
     float sensitivity = 0.5f;   // 0.0 to 1.0 (Threshold multiplier)
 
     // Constants
@@ -22,8 +22,8 @@ private:
 
     double sampleRate = 44100.0;
 
-    juce::dsp::FFT forwardFFT;
-    juce::dsp::WindowingFunction<float> window;
+    // static constexpr int overlap = fftSize - hopSize; // Already defined above
+    // double sampleRate = 44100.0; // Already defined above
 
     // Per-channel state for stereo independence
     struct ChannelState {
@@ -41,6 +41,10 @@ private:
 
         // Stuff for processing
         std::vector<float> fftData; // Scratch buffer for this channel
+        
+        // Independent FFT/Window for thread-safety/state-isolation
+        std::unique_ptr<juce::dsp::FFT> forwardFFT;
+        std::unique_ptr<juce::dsp::WindowingFunction<float>> window;
         
         // For visualizers
         std::vector<float> currentSpectrum; // The raw input spectrum of the latest frame

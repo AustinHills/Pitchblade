@@ -2,9 +2,7 @@
 
 #include "Pitchblade/effects/DeClickerProcessor.h"
 
-DeClickerProcessor::DeClickerProcessor() :
-    forwardFFT(fftOrder),
-    window(fftSize, juce::dsp::WindowingFunction<float>::hann, false)
+DeClickerProcessor::DeClickerProcessor()
 {
 }
 
@@ -18,13 +16,19 @@ void DeClickerProcessor::prepare(double sRate, int numChannels) {
         ch.inputBuffer.assign(fftSize, 0.0f);
         ch.outputBuffer.assign(fftSize, 0.0f);
         ch.fftData.assign(fftSize * 2, 0.0f);
-        ch.inputBufferPos = 0;
+        
+        // CRITICAL FIX: Initialize inputBufferPos to 'overlap' (steady state)
+        // If we start at 0, we fill 2048 samples then output 2048 samples.
+        // But the overlap-add shift logic (every 512 samples) assumes a 512-sample cadence.
+        // Starting at 0 causes the first 3/4 of the buffer to be replayed/garbage.
+        // Initialize independent FFT and Window
+        ch.forwardFFT = std::make_unique<juce::dsp::FFT>(fftOrder);
+        ch.window = std::make_unique<juce::dsp::WindowingFunction<float>>(fftSize, juce::dsp::WindowingFunction<float>::hann, false);
+
+        ch.inputBufferPos = fftSize - hopSize; // steady state start
         ch.outputBufferPos = 0;
         ch.spectralHistory.clear();
-        
-        // Pre-fill history to avoid empty checks or divide by zero
-        // We'll just push empty vectors, they'll be populated as we go
-        // Actually, let's keep it empty and handle it in processFrame
+        ch.lookAheadBuffer.clear();
     }
 
     // Initialize visualizer vectors
@@ -68,18 +72,29 @@ void DeClickerProcessor::process(juce::AudioBuffer<float>& buffer) {
             channelData[i] = outputSample; // Write back to buffer
 
             // If input buffer is full, process frame
+            // If input buffer is full, process frame
             if (channelState.inputBufferPos == fftSize) {
                 // Shift output buffer (Overlap-Add logic)
-                std::memmove(channelState.outputBuffer.data(), channelState.outputBuffer.data() + hopSize, overlap * sizeof(float));
-                std::fill(channelState.outputBuffer.data() + overlap, channelState.outputBuffer.data() + fftSize, 0.0f);
+                int numSamplesToMove = fftSize - hopSize; // 1536
+                // Manual shift
+                for (int k = 0; k < numSamplesToMove; ++k) {
+                    channelState.outputBuffer[k] = channelState.outputBuffer[k + hopSize];
+                }
+                std::fill(channelState.outputBuffer.data() + numSamplesToMove, channelState.outputBuffer.data() + fftSize, 0.0f);
+                
                 channelState.outputBufferPos = 0;
 
                 processFrame(channelState);
 
                 // Shift input buffer
-                std::memmove(channelState.inputBuffer.data(), channelState.inputBuffer.data() + hopSize, overlap * sizeof(float));
-                std::fill(channelState.inputBuffer.data() + overlap, channelState.inputBuffer.data() + fftSize, 0.0f);
-                channelState.inputBufferPos = overlap;
+                // Manual shift to avoid any memmove ambiguity
+                const int shiftSize = fftSize - hopSize; // 1536
+                for (int k = 0; k < shiftSize; ++k) {
+                    channelState.inputBuffer[k] = channelState.inputBuffer[k + hopSize];
+                }
+                std::fill(channelState.inputBuffer.begin() + shiftSize, channelState.inputBuffer.end(), 0.0f);
+                
+                channelState.inputBufferPos = shiftSize; // Start writing after the shifted data
             }
         }
     }
@@ -132,41 +147,36 @@ void DeClickerProcessor::process(juce::AudioBuffer<float>& buffer) {
 }
 
 void DeClickerProcessor::processFrame(ChannelState& channel) {
+    if (!channel.window || !channel.forwardFFT) return; // Safety check
+
     // 1. Prepare FFT Data
     std::copy(channel.inputBuffer.begin(), channel.inputBuffer.end(), channel.fftData.begin());
-    window.multiplyWithWindowingTable(channel.fftData.data(), fftSize);
+    channel.window->multiplyWithWindowingTable(channel.fftData.data(), fftSize);
     
-    // Clear imaginary part for real-only transform
-    // Note: juce::dsp::FFT uses packed format for real-only, but the size required is 2*fftSize for the perform function?
-    // Wait, performRealOnlyForwardTransform takes a buffer of size 2*fftSize where the first fftSize are input time-domain samples.
-    // The output is (fftSize/2 + 1) complex numbers.
-    // The existing DeNoiser implementation clears the second half:
-    // std::fill(fftData.data() + fftSize,fftData.data() + fftSize * 2, 0.0f);
-    std::fill(channel.fftData.data() + fftSize, channel.fftData.data() + fftSize * 2, 0.0f);
+    // Clear imaginary part / scratch space
+    std::fill(channel.fftData.begin() + fftSize, channel.fftData.end(), 0.0f);
 
-    forwardFFT.performRealOnlyForwardTransform(channel.fftData.data());
+    channel.forwardFFT->performRealOnlyForwardTransform(channel.fftData.data());
 
     // 2. Compute Magnitudes and Phases
     const int numBins = fftSize / 2 + 1;
     
-    // Resize visualizer buffers if needed (first run)
     if (channel.currentSpectrum.size() != numBins) channel.currentSpectrum.resize(numBins);
     if (channel.processedSpectrum.size() != numBins) channel.processedSpectrum.resize(numBins);
 
-    // Save Magnitudes
     std::vector<float> magnitudes(numBins);
     std::vector<float> phases(numBins);
 
-    // 3. Algorithm: Look-Ahead Queue & Processing
+    // --- LOOK-AHEAD LOGIC RESTORED ---
     
-    // Store RAW FFT Data (Real+Imag interleaved) in the buffer to preserve Phase
+    // Store RAW FFT Data in the buffer
     std::vector<float> currentFrameRaw(fftSize * 2);
     std::copy(channel.fftData.begin(), channel.fftData.end(), currentFrameRaw.begin());
     channel.lookAheadBuffer.push_back(currentFrameRaw);
     
     // Manage Latency
     if (channel.lookAheadBuffer.size() <= lookAheadDepth) {
-        // Latency period: Output silence (or passed zeroes) to maintain sync
+        // Latency period: Output silence
         std::fill(channel.fftData.begin(), channel.fftData.end(), 0.0f);
     } 
     else {
@@ -178,9 +188,6 @@ void DeClickerProcessor::processFrame(ChannelState& channel) {
         std::copy(processingRaw.begin(), processingRaw.end(), channel.fftData.begin());
         
         // Re-Compute Magnitudes & Phases for the Processing Frame
-        // (Yes, redundant calc, but safer than storing huge structs)
-        // Note: processingRaw has DC at [0], Nyquist at [1]
-        
         float mag0 = std::abs(channel.fftData[0]);
         float magNyq = std::abs(channel.fftData[1]);
         
@@ -189,7 +196,6 @@ void DeClickerProcessor::processFrame(ChannelState& channel) {
         phases[0] = 0.0f;
         phases[numBins - 1] = 0.0f;
         
-        // Complex bins
         for (int i = 1; i < numBins - 1; ++i) {
             float real = channel.fftData[i * 2];
             float imag = channel.fftData[i * 2 + 1];
@@ -197,9 +203,8 @@ void DeClickerProcessor::processFrame(ChannelState& channel) {
             phases[i] = std::atan2(imag, real);
         }
         
-        // Update Visualizer Input (This shows what is being processed *now*, slightly delayed)
+        // Update Visualizer Input
         for(int i=0; i<numBins; ++i) channel.currentSpectrum[i] = magnitudes[i];
-
 
         // --- CORE DETECTION LOGIC ---
         
@@ -213,79 +218,51 @@ void DeClickerProcessor::processFrame(ChannelState& channel) {
         }
 
         // 2. Calculate Future Average (Buffer peek)
-        // The deque contains [NextFrame, NextNextFrame, ...]
         std::vector<float> avgFuture(numBins, 0.0f);
         int futureCount = 0;
-        
-        // Peek at the *frames remaining in the buffer* (The Future)
-        // We need to compute magnitudes for them on the fly
+        int fIdx = 0;
         for (const auto& futureRaw : channel.lookAheadBuffer) {
-             // Quick magnitude estimation (DC/Nyq check skipped for speed, just iterate all as complex? No unsafe.)
-             // Just duplicate logic for safety
-             float fMag0 = std::abs(futureRaw[0]);
-             // float fMagNyq = std::abs(futureRaw[1]); // Not strictly 100% correct if packed differently but consistent
-             avgFuture[0] += fMag0;
-             // We can skip Nyquist for averaging, it's rarely voice fundamental
-             
-             for (int i = 1; i < numBins - 1; ++i) {
-                 float r = futureRaw[i * 2];
-                 float im = futureRaw[i * 2 + 1];
-                 avgFuture[i] += std::sqrt(r * r + im * im);
+             if (fIdx >= 2) { // Skip immediate overlaps
+                 float fMag0 = std::abs(futureRaw[0]);
+                 avgFuture[0] += fMag0;
+                 for (int i = 1; i < numBins - 1; ++i) {
+                     float r = futureRaw[i * 2];
+                     float im = futureRaw[i * 2 + 1];
+                     avgFuture[i] += std::sqrt(r * r + im * im);
+                 }
+                 futureCount++;
              }
-             futureCount++;
+             fIdx++;
         }
-        
         if (futureCount > 0) {
             juce::FloatVectorOperations::multiply(avgFuture.data(), 1.0f / (float)futureCount, numBins);
         }
 
-
         // 3. Thresholds & Correction
-        // Detect Click: Spikes above PAST but NOT above FUTURE (if future is loud, it's an onset)
-        // Actually: If (Current > Past * Thresh) AND (Current > Future * SustainThresh)?
-        // Or: (Current > Past*Thresh) AND (absolute future is quiet?)
-        
-        // Refined Logic from Plan:
-        // Click = Louder than Past AND Louder than Future.
-        // Onset = Louder than Past BUT Future is similar/louder.
-        
-        float baseThreshMult = juce::jmap(sensitivity, 0.0f, 1.0f, 20.0f, 1.5f);
+        float baseThreshMult = juce::jmap(sensitivity, 0.0f, 1.0f, 10.0f, 1.5f);
         
         for (int i = 0; i < numBins; ++i) {
             float currentMag = magnitudes[i];
             float pastVal = avgPast[i];
-            float futureVal = avgFuture[i]; // Look-Ahead Sustain
-            
-            // Frequency Weighting (Low Freq Protection)
-            // Frequencies below ~2000Hz get a multiplier
-            // Bin index -> Freq: i * SampleRate / FFTSize
-            // 2000Hz approx bin: 2000 * 2048 / 44100 ~= 92
+            float futureVal = avgFuture[i]; 
             
             float freqWeight = (i < 92) ? 3.0f : 1.0f; 
-            
             float clickThreshold = pastVal * baseThreshMult * freqWeight;
-            
-            // Silence Gate
-            if (pastVal < 0.0001f) clickThreshold = 0.001f; // higher floor
+            if (pastVal < 0.0001f) clickThreshold = 0.001f;
 
             bool isSpike = currentMag > clickThreshold;
             
-            // Sustain Verification (The Look-Ahead Check)
-            // If future is also loud (sustained), then it's NOT a click.
-            // Check if Future is at least 50% of Current? 
-            bool isSustained = futureVal > (currentMag * 0.5f);
+            // Sustain Verification (RESTORED)
+            // Check if Future is at least 10% of Current
+            bool isSustained = futureVal > (currentMag * 0.10f);
             
             if (isSpike && !isSustained) {
-                // IT IS A CLICK (Transient)
-                
-                // Ceiling Clamp: Limit to the threshold (plus headroom) instead of replacing with average
-                // This preserves energy and avoids "holes"
+                // Ceiling Clamp
                 magnitudes[i] = clickThreshold; 
             }
         }
         
-        // Update History with the *Processed* magnitude (Decoupling)
-        // Maintain history size
+        // Update History
         while (channel.spectralHistory.size() >= historyLength) {
              channel.spectralHistory.pop_front();
         }
@@ -294,9 +271,14 @@ void DeClickerProcessor::processFrame(ChannelState& channel) {
         // Update Visualizer Output
         for(int i=0; i<numBins; ++i) channel.processedSpectrum[i] = magnitudes[i];
         
-        // Reconstruct from Processed Magnitudes + Original Phase
-        channel.fftData[0] = magnitudes[0];
-        channel.fftData[1] = magnitudes[numBins - 1]; // Nyquist
+        // --- RECONSTRUCTION ---
+        
+        // DC/Nyquist with Sign Preservation
+        float originalDC = processingRaw[0];
+        float originalNyq = processingRaw[1];
+        
+        channel.fftData[0] = (originalDC >= 0.0f) ? magnitudes[0] : -magnitudes[0];
+        channel.fftData[1] = (originalNyq >= 0.0f) ? magnitudes[numBins - 1] : -magnitudes[numBins - 1]; 
         
         for (int i = 1; i < numBins - 1; ++i) {
             float m = magnitudes[i];
@@ -306,18 +288,21 @@ void DeClickerProcessor::processFrame(ChannelState& channel) {
         }
     }
 
+    // Clear imaginary/scratch part (fftSize..2*fftSize) before IFFT
+    // The IFFT expects packed complex format in the first half but may use the second half as scratch?
+    // Safer to clear it if we populated it with garbage from the queue.
+    std::fill(channel.fftData.begin() + fftSize, channel.fftData.end(), 0.0f);
     
-    // Window again (overlap-add requirement)
-    window.multiplyWithWindowingTable(channel.fftData.data(), fftSize);
+    // Inverse FFT to Time Domain
+    channel.forwardFFT->performRealOnlyInverseTransform(channel.fftData.data());
 
-    // Normalize (Overlap-add gain correction + Window gain)
-    // Hanning window adds up to 1.5x gain with 50% overlap? Or 2/3 scaling needed?
-    // DeNoiser used: multiply(..., 1.0f/1.5f, ...)
+    // Window again
+    channel.window->multiplyWithWindowingTable(channel.fftData.data(), fftSize);
+
+    // Normalize (Overlap-add gain correction)
     juce::FloatVectorOperations::multiply(channel.fftData.data(), 1.0f / 1.5f, fftSize);
 
     // Accumulate to Output Buffer
-    // Note: outputBuffer logic in 'process' shifts the buffer. 
-    // Here we just add the current frame's contribution.
     for (int i = 0; i < fftSize; ++i) {
         channel.outputBuffer[i] += channel.fftData[i];
     }
