@@ -36,23 +36,45 @@ private:
     juce::dsp::FFT forwardFFT;
     juce::dsp::WindowingFunction<float> window;
 
-    //Buffers for overlap add
-    std::vector<float> inputBuffer;
-    std::vector<float> outputBuffer;
-    int inputBufferPos = 0;
-    int outputBufferPos = 0;
+    // Struct to hold state for each channel
+    struct ChannelState {
+        //Buffers for overlap add
+        std::vector<float> inputBuffer;
+        std::vector<float> outputBuffer;
+        int inputBufferPos = 0;
+        int outputBufferPos = 0;
 
-    //Buffers for processing
-    std::vector<float> fftData;
-    std::vector<float> noiseProfile;
+        //Buffers for processing
+        std::vector<float> fftData;
+        std::vector<float> noiseProfile;
+
+        // Visualizer snapshots specific to this channel
+        std::vector<juce::Point<float>> latestSpectrumSnapshot;
+        std::vector<juce::Point<float>> latestNoiseSnapshot;
+
+        ChannelState() {
+            inputBuffer.resize(fftSize, 0.0f);
+            outputBuffer.resize(fftSize, 0.0f);
+            fftData.resize(fftSize * 2, 0.0f);
+            noiseProfile.resize(fftSize / 2 + 1, 0.0f);
+            latestSpectrumSnapshot.resize(fftSize / 2 + 1);
+            latestNoiseSnapshot.resize(fftSize / 2 + 1);
+        }
+    };
+
+    // Vector of channel states
+    std::vector<ChannelState> channels;
 
     //Main processing for a single frame
-    void processFrame();
+    void processFrame(ChannelState& state);
 
     //Storage for visualizer data
     juce::CriticalSection dataMutex;
     std::vector<juce::Point<float>> currentSpectrumData;
     std::vector<juce::Point<float>> noiseProfileData;
+
+    //Helper to average visualizer data from all channels
+    void updateVisualizer();
 public:
     //Constructor
     AdaptiveDeNoiserProcessor();
