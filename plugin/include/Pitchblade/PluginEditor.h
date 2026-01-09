@@ -32,11 +32,16 @@ It also applies the custom Look and Feel for the plugin.
 class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
                                               public juce::DragAndDropContainer,
                                               public juce::Button::Listener,     // Austin -  added this for the settings panel
-	                                          public juce::MouseListener         // reyna - for presets/settings closing on outside click
+	                                          public juce::MouseListener,         // reyna - for presets/settings closing on outside click
+                                              public juce::Timer,                 //For CPU usage update
+                                              public juce::AudioProcessorValueTreeState::Listener
 {
 public:
     explicit AudioPluginAudioProcessorEditor (AudioPluginAudioProcessor&);
     ~AudioPluginAudioProcessorEditor() override;
+    
+    // Parameter Listener
+    void parameterChanged(const juce::String& parameterID, float newValue) override;
     //==============================================================================
     void paint (juce::Graphics&) override;
     void resized() override;
@@ -68,6 +73,14 @@ public:
 	//Austin - button listener for settings/presets panel
     void buttonClicked(juce::Button* button) override;
 
+    //Shortcuts
+    bool keyPressed(const juce::KeyPress& key) override;
+
+    //For fullscreen button
+    void parentHierarchyChanged() override;
+
+    void timerCallback();
+
 private:
     // This reference is provided as a quick way for your editor to access the processor object that created it.
     AudioPluginAudioProcessor& processorRef;
@@ -81,6 +94,9 @@ private:
     VisualizerPanel visualizer;
 
 	juce::String activeEffectName;  // for active effect button coloring
+    
+    //Tracks active effect index
+    int activeEffectIndex = 0;
 
 	TooltipManager tooltipManager;  // tooltip manager
     std::unique_ptr<juce::TooltipWindow> tooltipWindow;

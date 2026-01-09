@@ -3,32 +3,48 @@ project(PitchbladeTests)
 
 
 # RubberBand configuration==============================================
-set(RUBBERBAND_DIR ${CMAKE_SOURCE_DIR}/plugin/third-party/rubberband)
-set(RUBBERBAND_INCLUDE_DIR ${RUBBERBAND_DIR}/include/)
+if(NOT TARGET RubberBand)
+    if(WIN32)
+        set(RUBBERBAND_DIR ${CMAKE_SOURCE_DIR}/plugin/third-party/rubberband)
+        set(RUBBERBAND_INCLUDE_DIR ${RUBBERBAND_DIR}/include/)
 
-# Select Release or Debug mode
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(RUBBERBAND_LIBRARY ${RUBBERBAND_DIR}/lib/x64/Debug/rubberband-library.lib)
-else()
-    set(RUBBERBAND_LIBRARY ${RUBBERBAND_DIR}/lib/x64/Release/rubberband-library.lib)
-endif()
+        set(RUBBERBAND_LIBRARY_DEBUG ${RUBBERBAND_DIR}/lib/x64/Debug/rubberband-library.lib)
+        set(RUBBERBAND_LIBRARY_RELEASE ${RUBBERBAND_DIR}/lib/x64/Release/rubberband-library.lib)
 
-# Import RubberBand as an interface library
-add_library(RubberBand STATIC IMPORTED)
-set_target_properties(RubberBand PROPERTIES
-    IMPORTED_LOCATION ${RUBBERBAND_LIBRARY}
-    INTERFACE_INCLUDE_DIRECTORIES ${RUBBERBAND_INCLUDE_DIR}
-)
+        # Import RubberBand as an interface library
+        add_library(RubberBand STATIC IMPORTED)
+        set_target_properties(RubberBand PROPERTIES
+            IMPORTED_LOCATION_DEBUG ${RUBBERBAND_LIBRARY_DEBUG}
+            IMPORTED_LOCATION_RELEASE ${RUBBERBAND_LIBRARY_RELEASE}
+            IMPORTED_LOCATION_RELWITHDEBINFO ${RUBBERBAND_LIBRARY_RELEASE}
+            IMPORTED_LOCATION_MINSIZEREL ${RUBBERBAND_LIBRARY_RELEASE}
+            INTERFACE_INCLUDE_DIRECTORIES ${RUBBERBAND_INCLUDE_DIR}
+        )
 
-# Verify the library exists
-if(NOT EXISTS ${RUBBERBAND_LIBRARY})
-    message(WARNING "RubberBand library not found at: ${RUBBERBAND_LIBRARY}")
+        # Verify the library exists
+        if(NOT EXISTS ${RUBBERBAND_LIBRARY_RELEASE})
+            message(WARNING "RubberBand library (Release) not found at: ${RUBBERBAND_LIBRARY_RELEASE}")
+        endif()
+
+    elseif(UNIX AND NOT APPLE) # Linux
+        find_package(PkgConfig REQUIRED)
+        pkg_check_modules(RUBBERBAND REQUIRED rubberband)
+
+        # Create an ALIAS library so we can link against 'RubberBand' consistently
+        # PkgConfig creates a target PkgConfig::RUBBERBAND if IMPORTED_TARGET is used, but manual is safer here
+        add_library(RubberBand INTERFACE)
+        target_include_directories(RubberBand INTERFACE ${RUBBERBAND_INCLUDE_DIRS})
+        target_link_libraries(RubberBand INTERFACE ${RUBBERBAND_LIBRARIES})
+        
+        message(STATUS "Found RubberBand (Tests): ${RUBBERBAND_LIBRARIES}")
+    endif()
 endif()
 
 # Create the test executable
 add_executable(runTests
     # List all your test files here as you create them
     test_main.cpp
+    test_AutoGainProcessor.cpp
     test_GainProcessor.cpp
     test_PitchDetector.cpp
     test_PitchCorrector.cpp
@@ -36,7 +52,9 @@ add_executable(runTests
     test_CompressorProcessor.cpp
     test_DeEsserProcessor.cpp
     test_DeNoiserProcessor.cpp
-    test_UI_DaisyChain.cpp
+    test_SaturationProcessor.cpp
+    test_UI_Daisychain.cpp
+    test_BandPassCompressorProcessor.cpp
     test_FormantShifter.cpp
     test_FormantDetector.cpp
     test_Equalizer.cpp

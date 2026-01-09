@@ -5,14 +5,19 @@
 #include "Pitchblade/PluginProcessor.h"
 #include "Pitchblade/ui/DaisyChain.h"
 
-// test helper to make daisychain rows , mirrors the one in daisychain.cpp
-static std::vector<AudioPluginAudioProcessor::Row>
-toProcessorRows_ForTests(const std::vector<DaisyChain::Row>& uiRows) {
-    std::vector<AudioPluginAudioProcessor::Row> out;
-    out.reserve(uiRows.size());
-    for (auto& r : uiRows)
-        out.push_back({ r.left, r.right });
-    return out;
+// test helper removed (toProcessorRows_ForTests) as it used deprecated structs
+
+// Helper to reconstruct layout from DaisyChain items (since getCurrentLayout was removed)
+static std::vector<DaisyChain::Row> getLayoutFromDaisyChain(const DaisyChain& dc) {
+    std::vector<DaisyChain::Row> layout;
+    for (auto* item : dc.items) {
+        if (!item) continue;
+        DaisyChain::Row r;
+        r.left = item->getName();
+        r.right = item->rightEffectName;
+        layout.push_back(r);
+    }
+    return layout;
 }
 
 //all ui tests 
@@ -24,7 +29,7 @@ TEST(DaisyChainTest, BuildsRowsFromProcessorNodes) {
 
     DaisyChain dc(proc, nodes);
 
-    const auto& layout = dc.getCurrentLayout();
+    const auto layout = getLayoutFromDaisyChain(dc);
     EXPECT_EQ(layout.size(), nodes.size());
 }
 
@@ -41,26 +46,8 @@ TEST(DaisyChainTest, CurrentOrderMatchesLayout) {
         EXPECT_EQ(order[i], nodes[i]->effectName);
 }
 
-// TC-23 verifies resetRowsToNodes restores the original processor layout
-TEST(DaisyChainTest, ResetRowsToNodesRestoresDefaultOrder) {
-    AudioPluginAudioProcessor proc;
-    auto& nodes = proc.getEffectNodes();
+// TC-23 test removed as it tested deprecated internal method resetRowsToNodes
 
-    DaisyChain dc(proc, nodes);
-
-    proc.getMutex().lock();
-    auto& layout = const_cast<std::vector<DaisyChain::Row>&>(dc.getCurrentLayout());
-    if (!layout.empty())
-        layout[0].left = "BrokenName";
-    proc.getMutex().unlock();
-
-    dc.resetRowsToNodes();
-    const auto& fixed = dc.getCurrentLayout();
-
-    ASSERT_EQ(fixed.size(), nodes.size());
-    if (!nodes.empty())
-        EXPECT_EQ(fixed[0].left, nodes[0]->effectName);
-}
 
 // TC-22 DaisyChain Default Global State
 // verifies reorderLocked default and bypass visual flag
@@ -83,7 +70,7 @@ TEST(DaisyChainTest, EffectNodeNamesMapToRowsCorrectly) {
     auto& nodes = proc.getEffectNodes();
 
     DaisyChain dc(proc, nodes);
-    const auto& layout = dc.getCurrentLayout();
+    const auto layout = getLayoutFromDaisyChain(dc);
 
     ASSERT_EQ(layout.size(), nodes.size());
 
@@ -120,9 +107,12 @@ TEST(DaisyChainTest, ItemBypassTogglesNodeState) {
     EXPECT_FALSE(targetNode->bypassed);
 
     // bypass click
-    item->onBypassChanged(item->getIndex(), true);
+    if (item->bypass.onClick)
+        item->bypass.onClick();
 
     EXPECT_TRUE(targetNode->bypassed);
+    // The UI state (item->bypassed) is updated by the onClick handler we just called
+    EXPECT_TRUE(item->bypassed);
     EXPECT_TRUE(item->bypassed);
 }
 
@@ -158,11 +148,13 @@ TEST(DaisyChainTest, ItemBypassDoubleClickRestoresState) {
         originalStates.push_back(n->bypassed);
 
     // first click bypass
-    item->onBypassChanged(item->getIndex(), true);
+    if (item->bypass.onClick)
+        item->bypass.onClick();
     EXPECT_TRUE(targetNode->bypassed);
 
     // second click restore
-    item->onBypassChanged(item->getIndex(), false);
+    if (item->bypass.onClick)
+        item->bypass.onClick();
     EXPECT_FALSE(targetNode->bypassed);
 
     // check if other nodes unchanged
@@ -245,7 +237,7 @@ TEST(DaisyChainTest, SplitModeUpdatesProcessorLayout) {
 
         dc.handleReorder(-2, right, 0);
 
-        const auto& layout = dc.getCurrentLayout();
+        const auto layout = getLayoutFromDaisyChain(dc);
 
         ASSERT_FALSE(layout.empty());
         EXPECT_EQ(layout[0].left, left);
@@ -267,7 +259,7 @@ TEST(DaisyChainTest, DoubleDownCreatesTwoParallelNodes) {
 
         dc.handleReorder(-2, right, 0);
 
-        const auto& layout = dc.getCurrentLayout();
+        const auto layout = getLayoutFromDaisyChain(dc);
 
         ASSERT_FALSE(layout.empty());
         EXPECT_TRUE(layout[0].hasRight());
@@ -290,14 +282,14 @@ TEST(DaisyChainTest, UniteModeCollapsesDoubleRow) {
 
         dc.handleReorder(-2, right, 0);
 
-        auto& layout = const_cast<std::vector<DaisyChain::Row>&>(dc.getCurrentLayout());
-        layout[0].right = "";
 
+        dc.handleReorder(-1, right, 2); // move 'right' to row 2
         dc.rebuild();
 
-        const auto& after = dc.getCurrentLayout();
+        const auto after = getLayoutFromDaisyChain(dc);
         EXPECT_EQ(after[0].left, left);
         EXPECT_FALSE(after[0].hasRight());
+
     }
 }
 
@@ -362,7 +354,6 @@ TEST(DaisyChainTest, AddCopyDeleteModifyBothUIAndProcessor) {
         clone->effectName = nodes[0]->effectName + " Added";
         nodes.push_back(clone);
 
-        dc.resetRowsToNodes();
         dc.rebuild();
     }
 
@@ -376,7 +367,6 @@ TEST(DaisyChainTest, AddCopyDeleteModifyBothUIAndProcessor) {
         copied->effectName = nodes[copyIndex]->effectName + " Copy";
         nodes.push_back(copied);
 
-        dc.resetRowsToNodes();
         dc.rebuild();
     }
 
@@ -388,7 +378,6 @@ TEST(DaisyChainTest, AddCopyDeleteModifyBothUIAndProcessor) {
         const auto removedName = nodes.back()->effectName;
         nodes.pop_back();
 
-        dc.resetRowsToNodes();
         dc.rebuild();
 
         bool stillPresent = false;
@@ -469,6 +458,7 @@ TEST(DaisyChainTest, ClosingOverlayUnlocksReorder) {
     EXPECT_FALSE(dc.isReorderLocked());
 
     dc.handleReorder(-1, baseline.back(), 0);
+    dc.rebuild(); 
     auto unlockedOrder = dc.getCurrentOrder();
     ASSERT_EQ(unlockedOrder.size(), baseline.size());
     // check  that order actually changed
@@ -573,13 +563,12 @@ TEST(DaisyChainTest, StateLoadReconstructsExactDaisyChainLayout) {
 
     ASSERT_GE(nodes1.size(), 2u);
 
-    // layout change : reverse order
-    auto layout1 = dc1.getCurrentLayout();
-    std::reverse(layout1.begin(), layout1.end());
-    proc1.requestLayout(toProcessorRows_ForTests(layout1));
+    // layout change : swap first two items using handleReorder
+    auto first = nodes1[0]->effectName;
+    dc1.handleReorder(-1, first, 2); // Move 1st item to 2nd position
 
-    dc1.resetRowsToNodes();
-    dc1.rebuild();
+    // sync is automatic via listeners, but we might need to wait/rebuild if it was async (it's sync here)
+    dc1.rebuild(); 
 
     auto orderBeforeSave = dc1.getCurrentOrder();
 

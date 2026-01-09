@@ -46,6 +46,8 @@ public:
 		button.setButtonText(effectName);
 		addAndMakeVisible(button);
 
+        button.addMouseListener(this,false);
+
 		// make buttons transparent
         button.setOpaque(false);
         rightButton.setOpaque(false);
@@ -144,7 +146,8 @@ public:
 
     // setter getter for chain mode
     void setChainModeId(int id) {
-        chainModeId = juce::jlimit(1, 4, id);
+        // Fix: Update limit to include 5 (LeftDouble)
+        chainModeId = juce::jlimit(1, 5, id); 
         modeButton.setButtonText(chaingID(chainModeId));
         modeButton.setEnabled(true);
 
@@ -162,8 +165,9 @@ public:
         switch (chainModeId) {
             case 1:  bg = Colors::accentTeal;       label = "D";         tooltipKey = "mode.down"; break;       // down         teal
             case 2:  bg = Colors::accentPink;       label = "S";         tooltipKey = "mode.split"; break;      // split        light pink 
-            case 3:  bg = Colors::accentPurple;     label = "DD";        tooltipKey = "mode.double"; break;     // doubleDown   purple
+            case 3:  bg = Colors::accentPurple;     label = "DD";        tooltipKey = "mode.double"; break;     // Right Double purple
             case 4:  bg = Colors::accentBlue;       label = "U";         tooltipKey = "mode.unite"; break;      // unite        blue
+            case 5:  bg = Colors::accentPurple;     label = "DD";        tooltipKey = "mode.double"; break;     // Left Double  purple (New)
             default: bg = Colors::accent;           label = "M";         tooltipKey = "mode.unknown"; break;
         }
         modeButton.setButtonText(label);
@@ -176,11 +180,11 @@ public:
         modeButton.repaint();
     }
 
-	//for external bypass changes, changes button color if gobal bypassed
+    //for external bypass changes, changes button color if gobal bypassed
     void updateBypassVisual(bool state) {
         bypassed = state;
 
-        const auto bg = state ? juce::Colours::hotpink : Colors::panel;
+        const auto bg = state ? Colors::accent : Colors::panel;
         bypass.setColour(juce::TextButton::buttonColourId, bg);
         bypass.setColour(juce::TextButton::buttonOnColourId, bg);
         bypass.setColour(juce::TextButton::textColourOffId, Colors::buttonText);
@@ -192,6 +196,22 @@ public:
 	// drag and drop /////////////////////////////////
 
     void mouseDown(const juce::MouseEvent& e) override {
+        //Right click context menu detection
+        if (e.mods.isPopupMenu()) {
+            bool isRightSide = false;
+            
+            // Check if clicked the right button directly, or the right half of the row
+            if (e.eventComponent == &rightButton) {
+                isRightSide = true;
+            } 
+            else if (hasRight && e.getPosition().getX() > getWidth() / 2) {
+                isRightSide = true;
+            }
+
+            if (onContextMenu) onContextMenu(myIndex, isRightSide);
+            return;
+        }
+        
         //  check if parent DaisyChain is locked
         if (auto* parent = getParentComponent()) {
             // climb up component tree until it finds DaisyChain
@@ -207,9 +227,15 @@ public:
             }
         }
         if (e.mods.isLeftButtonDown()) {
-            if (auto* container = juce::DragAndDropContainer::findParentDragContainerFor(this)) {
-                auto snapshot = createComponentSnapshot(getLocalBounds());
-                container->startDragging(getName(), this, snapshot, true);
+            // Only start dragging if the user clicked one of the grips.
+            // This allows button clicks (which bubble up to this listener) to pass through.
+            if (e.eventComponent == &grip || e.eventComponent == &rightGrip) {
+                if (auto* container = juce::DragAndDropContainer::findParentDragContainerFor(this)) {
+                    juce::String dragName = (e.eventComponent == &rightGrip) ? rightEffectName : getName();
+                    
+                    auto snapshot = createComponentSnapshot(getLocalBounds());
+                    container->startDragging(dragName, this, snapshot, true);
+                }
             }
         }
     }
@@ -317,6 +343,9 @@ public:
         rightButton.setButtonText(effectName);
         rightButton.setVisible(true);
 
+        //Listen for right button clicks
+        rightButton.addMouseListener(this,false);
+
         rightMode.setButtonText(chaingID(/*DoubleDown*/ 3));
         rightMode.setEnabled(false);
         rightMode.setVisible(true);
@@ -362,12 +391,47 @@ public:
 
 	// update right mode visual
     void updateRightModeVisual() {
-        juce::Colour bg = juce::Colour(0xffae66ed); 
+        juce::Colour bg;
+        switch (chainModeId) {
+            case 3: bg = Colors::accentPurple; break; // Right Double
+            default: bg = juce::Colour(0xffae66ed); break; 
+        }
+    
         rightMode.setColour(juce::TextButton::buttonColourId, bg);
         rightMode.setColour(juce::TextButton::buttonOnColourId, bg);
         rightMode.setColour(juce::TextButton::textColourOffId, Colors::buttonText);
         rightMode.setColour(juce::TextButton::textColourOnId, Colors::buttonText);
         rightMode.repaint();
+    }
+
+    void refreshColors() {
+        // Refresh main button selection color
+        if (onEffectSelected) { button.setColour(juce::TextButton::buttonColourId, Colors::accent); }
+        else { button.setColour(juce::TextButton::buttonColourId, Colors::panel); }
+        
+        button.setColour(juce::TextButton::textColourOffId, Colors::buttonText);
+        button.setColour(juce::TextButton::textColourOnId, Colors::buttonText);
+
+        // Refresh bypass button
+        updateBypassVisual(bypassed);
+
+        // Refresh mode button
+        updateModeVisual();
+
+        // Refresh right side components if they exist
+        if (hasRight) {
+            if (onEffectSelected) { // Assuming right button shares selection logic or just default
+                 // Right button selection logic seems missing in original code, treating as default panel color for now unless logic added
+                 rightButton.setColour(juce::TextButton::buttonColourId, Colors::panel); 
+            }
+            rightButton.setColour(juce::TextButton::textColourOffId, Colors::buttonText);
+            rightButton.setColour(juce::TextButton::textColourOnId, Colors::buttonText);
+
+            updateSecondaryBypassVisual(rightBypassed);
+            updateRightModeVisual();
+        }
+        
+        repaint();
     }
 
     /////////////////////////////////////////////////////////////////////////////// callbacks
@@ -382,6 +446,9 @@ public:
     std::function<void(int, bool)> onBypassChanged;     //row index, bypass
 	std::function<void(int, int)> onModeChanged;        //row index, mode id
     std::function<void(int, bool)> onSecondaryBypassChanged;
+
+    //Callback for right click context menu
+    std::function<void(int, bool)> onContextMenu;
 
 	juce::String rightEffectName;   // name of right effect if double
 

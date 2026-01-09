@@ -2,33 +2,46 @@
 cmake_minimum_required(VERSION 3.22)
 
 # Project name
-project(Pitchblade VERSION 1.0.1)
+project(Pitchblade VERSION 1.1.0)
 
 # RubberBand configuration==============================================
-set(RUBBERBAND_DIR ${CMAKE_SOURCE_DIR}/plugin/third-party/rubberband)
-set(RUBBERBAND_INCLUDE_DIR ${RUBBERBAND_DIR}/include/)
+if(WIN32)
+    set(RUBBERBAND_DIR ${CMAKE_SOURCE_DIR}/plugin/third-party/rubberband)
+    set(RUBBERBAND_INCLUDE_DIR ${RUBBERBAND_DIR}/include/)
 
-# Select Release or Debug mode
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(RUBBERBAND_LIBRARY ${RUBBERBAND_DIR}/lib/x64/Debug/rubberband-library.lib)
-else()
-    set(RUBBERBAND_LIBRARY ${RUBBERBAND_DIR}/lib/x64/Release/rubberband-library.lib)
+    set(RUBBERBAND_LIBRARY_DEBUG ${RUBBERBAND_DIR}/lib/x64/Debug/rubberband-library.lib)
+    set(RUBBERBAND_LIBRARY_RELEASE ${RUBBERBAND_DIR}/lib/x64/Release/rubberband-library.lib)
+
+    # Import RubberBand as an interface library
+    add_library(RubberBand STATIC IMPORTED)
+    set_target_properties(RubberBand PROPERTIES
+        IMPORTED_LOCATION_DEBUG ${RUBBERBAND_LIBRARY_DEBUG}
+        IMPORTED_LOCATION_RELEASE ${RUBBERBAND_LIBRARY_RELEASE}
+        IMPORTED_LOCATION_RELWITHDEBINFO ${RUBBERBAND_LIBRARY_RELEASE}
+        IMPORTED_LOCATION_MINSIZEREL ${RUBBERBAND_LIBRARY_RELEASE}
+        INTERFACE_INCLUDE_DIRECTORIES ${RUBBERBAND_INCLUDE_DIR}
+    )
+
+    # Verify the library exists (Check Debug as a proxy or check both)
+    if(NOT EXISTS ${RUBBERBAND_LIBRARY_RELEASE})
+        message(WARNING "RubberBand library (Release) not found at: ${RUBBERBAND_LIBRARY_RELEASE}")
+    endif()
+
+elseif(UNIX AND NOT APPLE) # Linux
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(RUBBERBAND REQUIRED rubberband)
+
+    # Create an ALIAS library so we can link against 'RubberBand' consistently
+    # PkgConfig creates a target PkgConfig::RUBBERBAND if IMPORTED_TARGET is used, but manual is safer here
+    add_library(RubberBand INTERFACE)
+    target_include_directories(RubberBand INTERFACE ${RUBBERBAND_INCLUDE_DIRS})
+    target_link_libraries(RubberBand INTERFACE ${RUBBERBAND_LIBRARIES})
+    
+    message(STATUS "Found RubberBand: ${RUBBERBAND_LIBRARIES}")
 endif()
-
-# Import RubberBand as an interface library
-add_library(RubberBand STATIC IMPORTED)
-set_target_properties(RubberBand PROPERTIES
-    IMPORTED_LOCATION ${RUBBERBAND_LIBRARY}
-    INTERFACE_INCLUDE_DIRECTORIES ${RUBBERBAND_INCLUDE_DIR}
-)
 
 set(LIB_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libs)
 file(MAKE_DIRECTORY ${LIB_DIR})
-
-# Verify the library exists
-if(NOT EXISTS ${RUBBERBAND_LIBRARY})
-    message(WARNING "RubberBand library not found at: ${RUBBERBAND_LIBRARY}")
-endif()
 
 # JUCE configuration====================================================
 find_package(JUCE CONFIG REQUIRED)
@@ -38,8 +51,8 @@ juce_add_plugin(${PROJECT_NAME}
     
 
     # VERSION ...                               # Set this if the plugin version is different to the project version
-    # ICON_BIG ...                              # ICON_* arguments specify a path to an image file to use as an icon for the Standalone
-    # ICON_SMALL ...
+    ICON_BIG "assets/pb_logo.png"
+    ICON_SMALL "assets/pb_logo.png"
     COMPANY_NAME "WSU PITCHBLADE TEAM"          # Specify the name of the plugin's author
     BUNDLE_ID "com.WSUPitchbladeTeam.Pitchblade"    #for mac functionality, ios hosts will reject bundle IDs with spaces
     IS_SYNTH FALSE                              # Is this a synth or an effect?
@@ -71,6 +84,7 @@ target_sources(${PROJECT_NAME}
         source/ui/FrequencyGraphVisualizer.cpp
         source/ui/EqualizerVisualizer.cpp
         source/ui/FormantVisualizer.cpp
+        source/ui/ColorPalette.cpp
         source/panels/PresetsPanel.cpp
         
 
@@ -80,11 +94,18 @@ target_sources(${PROJECT_NAME}
         source/panels/FormantPanel.cpp
         source/panels/PitchPanel.cpp
         source/panels/CompressorPanel.cpp
+        source/panels/BandPassCompressorPanel.cpp
         source/panels/DeEsserPanel.cpp
         source/panels/DeNoiserPanel.cpp
         source/panels/SettingsPanel.cpp
         source/panels/EqualizerPanel.cpp
+        source/panels/VST3Panel.cpp
+        source/panels/AdaptiveDeNoiserPanel.cpp
+        source/panels/SaturationPanel.cpp
+        source/panels/AutoGainPanel.cpp
+        source/panels/EffectNode.cpp
 
+        source/effects/AutoGainProcessor.cpp
         source/effects/GainProcessor.cpp
         source/effects/NoiseGateProcessor.cpp
         source/effects/FormantDetector.cpp
@@ -92,10 +113,13 @@ target_sources(${PROJECT_NAME}
         source/effects/PitchCorrector.cpp
         source/effects/PitchShifter.cpp
         source/effects/CompressorProcessor.cpp
+        source/effects/BandPassCompressorProcessor.cpp
         source/effects/FormantShifter.cpp
         source/effects/DeEsserProcessor.cpp
         source/effects/DeNoiserProcessor.cpp
         source/effects/Equalizer.cpp
+        source/effects/AdaptiveDeNoiserProcessor.cpp
+        source/effects/SaturationProcessor.cpp
 
 )
 
@@ -141,6 +165,7 @@ target_compile_definitions(${PROJECT_NAME}
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
         JUCE_VST3_CAN_REPLACE_VST2=0
+        JUCE_PLUGINHOST_VST3=1
 )
 
 if(MSVC)

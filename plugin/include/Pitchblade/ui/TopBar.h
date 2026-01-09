@@ -27,4 +27,10 @@ public:
 
 	// logo image
     juce::ImageComponent logo;
+
+    // Helper to update the text
+    void updateCpuStats(float load, float ms);
+    void refreshColors();
+
+    juce::Label cpuLabel;
 };

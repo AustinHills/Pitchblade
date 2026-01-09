@@ -29,8 +29,13 @@ public:
 
     void paint(juce::Graphics& g) override;
     void resized() override;
+    void refreshColors();
 
     std::function<void()> onPresetActionFinished; // callback after preset action
+
+    //Moving these here to make the shortcut easier to handle
+    void handleSavePreset();
+    void handleLoadPreset();
 
 private:
     AudioPluginAudioProcessor& processor;
@@ -43,8 +48,6 @@ private:
 	// file chooser for loading/saving presets
     std::unique_ptr<juce::FileChooser> chooser;
 
-    void handleSavePreset();
-    void handleLoadPreset();
     void handleDefaultPreset();
 
     void showDefaultMenu();

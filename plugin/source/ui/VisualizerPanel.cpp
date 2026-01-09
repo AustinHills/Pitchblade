@@ -12,7 +12,7 @@ VisualizerPanel::VisualizerPanel(AudioPluginAudioProcessor& proc, std::vector<st
     addAndMakeVisible(tabs);
     refreshTabs();
 
-    setInterceptsMouseClicks(false, false);
+    setInterceptsMouseClicks(false, true);
 }
 
 void VisualizerPanel::paint(juce::Graphics& g) {

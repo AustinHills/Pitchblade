@@ -7,18 +7,32 @@
 // Color palette
 namespace Colors
 {
-    inline const auto background    = juce::Colour::fromString("ff363e52");     // background
-    inline const auto panel         = juce::Colour::fromString("ff19182b");     // panel bg
+    // Define Theme Enum
+    enum class Theme {
+        Dark,
+        Light,
+        Sunset,
+        Pink,
+        Green
+    };
 
-    inline const auto accent        = juce::Colour::fromString("fff551c1");     // outlines & active text
-    inline const auto accentLight   = juce::Colour::fromString("ff686495");     // accent color
+    // Control functions
+    void setTheme(Theme t);
+    Theme getCurrentTheme();
 
-    inline const auto accentPink    = juce::Colour::fromString("ffe966ed");     // light pink
-    inline const auto accentPurple  = juce::Colour::fromString("ffae66ed");     // purple
-    inline const auto accentBlue    = juce::Colour::fromString("ff668ced");     // blue
-    inline const auto accentTeal    = juce::Colour::fromString("ff46bad4");     // teal
+    // Variable colors (now extern, defined in .cpp)
+    extern juce::Colour background;
+    extern juce::Colour panel;
+    
+    extern juce::Colour accent;
+    extern juce::Colour accentLight;
 
-    inline const auto button        = juce::Colour::fromString("ff19182b");     // button bg
-    inline const auto buttonText    = juce::Colours::white;                     // button text normal
-    inline const auto buttonActive  = juce::Colour::fromString("fff551c1");     // button text active
+    extern juce::Colour accentPink;
+    extern juce::Colour accentPurple;
+    extern juce::Colour accentBlue;
+    extern juce::Colour accentTeal;
+
+    extern juce::Colour button;
+    extern juce::Colour buttonText;
+    extern juce::Colour buttonActive;
 }

@@ -71,7 +71,7 @@ class EqualizerNode : public EffectNode
 public:
     // create node with default apvts and register under EffectNodes
     explicit EqualizerNode(AudioPluginAudioProcessor& proc)
-        : EffectNode(proc, "EqualizerNode", "Equalizer")
+        : EffectNode(proc, "EqualizerNode", "Equalizer"), processor(proc)
     {
         juce::ValueTree st("EqualizerNode");
         st.setProperty("LowFreq", 200.0f, nullptr);
@@ -85,13 +85,10 @@ public:
         // make sure the global tree exists
         if (!processor.apvts.state.hasType("EffectNodes"))
             processor.apvts.state = juce::ValueTree("EffectNodes");
-
-        // attach this new tree to EffectNodes as a new child
-        processor.apvts.state.addChild(st, -1, nullptr);
-
-        // assign this new unique state to this node
-        nodeState = st;
     }
+
+    EqualizerNode(AudioPluginAudioProcessor& proc, const juce::ValueTree& existingState)
+        : EffectNode(proc, existingState), processor(proc) {}
 
     // use node state for the panel
     std::unique_ptr<juce::Component> createPanel(AudioPluginAudioProcessor& proc) override {
@@ -155,4 +152,6 @@ public:
         st.setProperty("HighFreq", (float)xml.getDoubleAttribute("HighFreq", 6000.0), nullptr);
         st.setProperty("HighGain", (float)xml.getDoubleAttribute("HighGain", 0.0), nullptr);
     }
+private:
+    AudioPluginAudioProcessor& processor;
 };

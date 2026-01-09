@@ -56,7 +56,7 @@ EqualizerPanel::EqualizerPanel (AudioPluginAudioProcessor& proc, juce::ValueTree
     auto updateTree = [this](juce::Slider& s, const juce::String& key) {
         s.onValueChange = [this, &s, key]() {
             // Update local state for persistence/serialization
-            localState.setProperty(key, (float)s.getValue(), nullptr);
+            localState.setProperty(key, (float)s.getValue(), &processor.undoManager);
 
             // Also push the value directly to the audio DSP via thread-safe setters
             // avoid reading/writing the ValueTree from the audio thread.
@@ -66,6 +66,10 @@ EqualizerPanel::EqualizerPanel (AudioPluginAudioProcessor& proc, juce::ValueTree
             else if (key == "MidGain")   processor.getEqualizer().setMidGainDb((float)s.getValue());
             else if (key == "HighFreq")  processor.getEqualizer().setHighFreq((float)s.getValue());
             else if (key == "HighGain")  processor.getEqualizer().setHighGainDb((float)s.getValue());
+        };
+
+        s.onDragStart = [this]() {
+            processor.undoManager.beginNewTransaction();
         };
     };
     updateTree(lowFreq, "LowFreq");

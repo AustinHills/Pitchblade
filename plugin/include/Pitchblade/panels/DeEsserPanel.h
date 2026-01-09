@@ -95,12 +95,11 @@ public:
         if (!processor.apvts.state.hasType("EffectNodes"))
             processor.apvts.state = juce::ValueTree("EffectNodes");
 
-        //Add this node to processor state tree
-        processor.apvts.state.addChild(getMutableNodeState(), -1, nullptr);
-
-        //Preparing the de-esser
         deEsserDSP.prepare(proc.getSampleRate(),proc.getCurrentBlockSize());
     }
+
+    DeEsserNode(AudioPluginAudioProcessor& proc, const juce::ValueTree& existingState)
+        : EffectNode(proc, existingState), processor(proc) {}
 
     //dsp processing step for de-esser
     void process(AudioPluginAudioProcessor& proc, juce::AudioBuffer<float>& buffer) override{

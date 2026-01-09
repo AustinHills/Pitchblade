@@ -19,18 +19,23 @@ RealTimeGraphVisualizer::RealTimeGraphVisualizer(juce::AudioProcessorValueTreeSt
     switch(initialIndex){
         case 1:
             startTimerHz(5);
+            pointsPerPush = 12;
             break;
         case 2:
             startTimerHz(15);
+            pointsPerPush = 4;
             break;
         case 3:
             startTimerHz(30);
+            pointsPerPush = 2;
             break;
         case 4:
             startTimerHz(60);
+            pointsPerPush = 1;
             break;
         default:
             startTimerHz(30);
+            pointsPerPush = 2;
             break;
     }
 }
@@ -98,7 +103,9 @@ void RealTimeGraphVisualizer::pushData(float newDataPoint){
     juce::ScopedLock lock(dataMutex);
 
     //Add new data in the back of the queue
-    dataQueue.push_back(newDataPoint);
+    for(int i = 0;i < pointsPerPush; i++){
+        dataQueue.push_back(newDataPoint);
+    }
 
     //Purge old data if the queue is now larger than graph width
     while(dataQueue.size() > maxDataPoints){
@@ -290,22 +297,35 @@ float RealTimeGraphVisualizer::mapValuetoY(float value) const{
 void RealTimeGraphVisualizer::parameterChanged(const juce::String& parameterID, float newValue){
     if(parameterID == "GLOBAL_FRAMERATE"){
         stopTimer();
+        
+        int newTimerHz, newPointsPerPush;
+
         switch((int)newValue){
         case 1:
-            startTimerHz(5);
+            newTimerHz = 5;
+            newPointsPerPush = 12;
             break;
         case 2:
-            startTimerHz(15);
+            newTimerHz = 15;
+            newPointsPerPush = 4;
             break;
         case 3:
-            startTimerHz(30);
+            newTimerHz = 30;
+            newPointsPerPush = 2;
             break;
         case 4:
-            startTimerHz(60);
+            newTimerHz = 60;
+            newPointsPerPush = 1;
             break;
         default:
-            startTimerHz(30);
+            newTimerHz = 30;
+            newPointsPerPush = 2;
             break;
-    }
+        }
+
+        startTimerHz(newTimerHz);
+
+        juce::ScopedLock lock(dataMutex);
+        pointsPerPush = newPointsPerPush;
     }
 }

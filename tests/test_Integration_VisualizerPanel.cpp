@@ -10,6 +10,7 @@
 
 // TC-86 DaisyChain Integration with VisualizerPanel
 TEST(VisualizerIntegrationTest, DaisyChainSynchronizesWithVisualizerPanel) {
+    juce::ScopedJuceInitialiser_GUI guiInitialiser;
     AudioPluginAudioProcessor proc;
     proc.prepareToPlay(44100.0, 512);
 
@@ -41,6 +42,7 @@ TEST(VisualizerIntegrationTest, DaisyChainSynchronizesWithVisualizerPanel) {
 
 // TC-87 Clicking DaisyChainItem opens the correct visualizer tab
 TEST(VisualizerIntegrationTest, ClickingDaisyChainItemOpensCorrectTab) {
+    juce::ScopedJuceInitialiser_GUI guiInitialiser;
     AudioPluginAudioProcessor proc;
     proc.prepareToPlay(44100.0, 512);
 

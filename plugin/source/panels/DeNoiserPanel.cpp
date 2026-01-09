@@ -53,18 +53,19 @@ DeNoiserPanel::DeNoiserPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& s
     reductionSlider.setNumDecimalPlacesToDisplay(2);
     addAndMakeVisible(reductionSlider);
 
-    //Reduction label
-    reductionLabel.setText("Reduction Intensity",juce::dontSendNotification);
-    reductionLabel.setJustificationType(juce::Justification::centred);
-    addAndMakeVisible(reductionLabel);
+    //Reduction label: Use slider name instead
+    reductionSlider.setName("Reduction Intensity");
 
     //Link sliders to local state properties
     const float startReduction = (float)localState.getProperty("DenoiserReduction",0.5f);
     reductionSlider.setRange(0.0,1.0f,0.01f);
     reductionSlider.setValue(startReduction,juce::dontSendNotification);
     reductionSlider.onValueChange = [this]() {
-        localState.setProperty("DenoiserReduction",(float)reductionSlider.getValue(),nullptr);
+        localState.setProperty("DenoiserReduction",(float)reductionSlider.getValue(),&processor.undoManager);
         };
+    reductionSlider.onDragStart = [this]() {
+        processor.undoManager.beginNewTransaction();
+    };
 
     //Add this panel as a listener to the local state
     localState.addListener(this);
@@ -98,8 +99,7 @@ void DeNoiserPanel::resized(){
     dials.removeFromLeft(dialWidth);
     auto reductionArea = dials.removeFromLeft(dialWidth).reduced(5);
 
-    //Positioning reduction label and slider
-    reductionLabel.setBounds(reductionArea.removeFromTop(10));
+    //Positioning reduction slider (label is now drawn by slider)
     reductionSlider.setBounds(reductionArea);
 }
 

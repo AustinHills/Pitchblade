@@ -19,14 +19,17 @@
 #include "Pitchblade/panels/EffectNode.h"
 
 //sidebar component showing the chain of effects
-class DaisyChain : public juce::Component {
+class DaisyChain : public juce::Component, public juce::ValueTree::Listener {
 public:
     DaisyChain(AudioPluginAudioProcessor& proc, std::vector<std::shared_ptr<EffectNode>>& nodes);
+
+    ~DaisyChain();
 
     void resized() override;
     void paint(juce::Graphics&) override;
 	void setGlobalBypassVisual(bool globalBypassed);    // grayed out when global bypassed
 	void setChainControlsEnabled(bool enabled);         // enable/disable chain controls
+    void refreshColors();
 
 	//refeshes ui from effectnodes
     void rebuild();
@@ -40,20 +43,19 @@ public:
     };
 
     // helper accessors
-    const std::vector<Row>& getCurrentLayout() const { return rows; }   // new layout model
+    // const std::vector<Row>& getCurrentLayout() const;  // removed as unused/unimplemented
     std::vector<juce::String> getCurrentOrder() const;                  // flatten rows for old API
 
 	juce::OwnedArray<DaisyChainItem> items; // ui rows
-
-    //setter getter for rows
-    void setRows(const std::vector<Row>& newRows) {  rows = newRows; rebuild(); }
-    std::vector<Row> getRows() const {  return rows; }
-    void clearRows() { rows.clear(); }
 
 	//add + copy buttons
     juce::TextButton addButton{ "Add" };
     juce::TextButton duplicateButton{ "Copy" };
     juce::TextButton deleteButton{ "Del" };
+
+    //Undo/Redo buttons
+    juce::TextButton undoButton{ "Undo" };
+    juce::TextButton redoButton{ "Redo" };
 
 	// menus for add/duplicate/delete
     void showAddMenu();
@@ -74,8 +76,6 @@ public:
     // notify editor when any bypass state changes
     std::function<void()> onAnyBypassChanged;
 
-    void resetRowsToNodes(); // force rows to mirror processor/effectNodes for loading presets
-
     int getNumItems() const { return items.size(); }    // get number of items
 
 	// get item at index
@@ -85,6 +85,13 @@ public:
         return items[index];
     }
 
+    // Listen to the APVTS to update UI
+    void valueTreeChildAdded(juce::ValueTree&, juce::ValueTree&) override;
+    void valueTreeChildRemoved(juce::ValueTree&, juce::ValueTree&, int) override;
+    void valueTreeChildOrderChanged(juce::ValueTree&, int, int) override;
+
+    void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier& property) override;
+
 //private:
 	// reorder handler for multi row support
     // kind: -1 vertical insert, -2 right-slot insert (double row)
@@ -93,8 +100,10 @@ public:
 	std::shared_ptr<EffectNode> findNodeByName(const juce::String& name) const; // helper to find node by name
     std::vector<std::shared_ptr<EffectNode>>& effectNodes;                      // refern to processor's chain
 
+    //Helper to show context menu for specific node
+    void showContextMenu(int index, bool isRightSide);
+
 private:
-	std::vector<Row> rows;              // current layout model
 	juce::Viewport scrollArea;          // scroll area for daisy chain
 	juce::Component effectsContainer;   // container for effect items
 	bool globalBypassed = false;        // global bypass state

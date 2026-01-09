@@ -114,3 +114,56 @@ TEST_F(DeNoiserProcessorTest, ReLearnProfile) {
 
     ASSERT_NEAR(buffer.getMagnitude(0, samplesPerBlock), juce::Decibels::decibelsToGain(-40.0f), 0.001f);
 }
+
+TEST_F(DeNoiserProcessorTest, StereoIsolation) {
+    // 2 channels
+    juce::AudioBuffer<float> buffer(2, samplesPerBlock);
+    processor->prepare(sampleRate);
+
+    processor->setLearning(true);
+
+    // Train on Channel 1 (leaving Channel 0 silence)
+    int numBlocks = blocksForMS(500.0f);
+    for(int i = 0; i < numBlocks; ++i) {
+        buffer.clear();
+        auto sineData = makeSineFrame(1000.0f, samplesPerBlock);
+        juce::FloatVectorOperations::multiply(sineData.data(), juce::Decibels::decibelsToGain(-40.0f), samplesPerBlock);
+        
+        // Channel 0 is silent, Channel 1 has noise
+        juce::FloatVectorOperations::copy(buffer.getWritePointer(1), sineData.data(), samplesPerBlock);
+        
+        processor->process(buffer);
+    }
+
+    processor->setLearning(false);
+    processor->setReduction(1.0f);
+
+    // Now signal on BOTH channels. 
+    // Channel 0 signal should pass through (since it didn't learn noise there)
+    // Channel 1 signal should be reduced (since it learned noise there)
+    // IMPORTANT: The noise profile for Ch0 should be near zero, Ch1 should be high.
+    
+    // We send the "noise" frequency again to see if it gets cut
+    buffer.clear();
+    auto sineData = makeSineFrame(1000.0f, samplesPerBlock);
+    juce::FloatVectorOperations::multiply(sineData.data(), juce::Decibels::decibelsToGain(-40.0f), samplesPerBlock);
+    
+    // Put same signal on both
+    juce::FloatVectorOperations::copy(buffer.getWritePointer(0), sineData.data(), samplesPerBlock);
+    juce::FloatVectorOperations::copy(buffer.getWritePointer(1), sineData.data(), samplesPerBlock);
+    
+    // Run enough blocks to clear latency/buffers
+    for(int i=0; i<10; ++i) {
+        processor->process(buffer);
+    }
+
+    float rmsCh0 = buffer.getRMSLevel(0, 0, samplesPerBlock);
+    float rmsCh1 = buffer.getRMSLevel(1, 0, samplesPerBlock);
+
+    // Channel 0 should retain signal (near -40dB)
+    // Channel 1 should be reduced (near 0)
+    
+    // Allow some tolerance for FFT windowing/overlap loss
+    ASSERT_GT(rmsCh0, 0.005f) << "Channel 0 signal was incorrectly reduced!";
+    ASSERT_LT(rmsCh1, 0.001f) << "Channel 1 noise was not reduced!";
+}

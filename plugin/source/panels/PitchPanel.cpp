@@ -100,13 +100,13 @@ PitchPanel::PitchPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& state)
     scaleOffsetBox.onChange = [this]() {
         int id = scaleOffsetBox.getSelectedId();
         int offset = id - 12;
-        localState.setProperty("PitchOffset", offset, nullptr);
+        localState.setProperty("PitchOffset", offset, &processor.undoManager);
         processor.getPitchCorrector().setScaleOffset(offset);
     };
 
     scaleTypeBox.onChange = [this]() {
         int id = scaleTypeBox.getSelectedId();
-        localState.setProperty("PitchType", id, nullptr);
+        localState.setProperty("PitchType", id, &processor.undoManager);
         processor.getPitchCorrector().setScaleType(id);
     };
 
@@ -115,29 +115,41 @@ PitchPanel::PitchPanel(AudioPluginAudioProcessor& proc, juce::ValueTree& state)
     retuneSlider.setRange(0.f, 1.f, 0.05f);
     retuneSlider.setValue(startRetunePercent, juce::dontSendNotification);
     retuneSlider.onValueChange = [this]() {
-        localState.setProperty("PitchRetune", (float)retuneSlider.getValue(), nullptr);
+        localState.setProperty("PitchRetune", (float)retuneSlider.getValue(), &processor.undoManager);
         };
+    retuneSlider.onDragStart = [this]() {
+        processor.undoManager.beginNewTransaction();
+    };
 
     const float noteTransitionCents = (float)localState.getProperty("PitchNoteTransition", 50.f);
     noteTransitionSlider.setRange(0.f, 50.f, 1.f);
     noteTransitionSlider.setValue(noteTransitionCents, juce::dontSendNotification);
     noteTransitionSlider.onValueChange = [this]() {
-        localState.setProperty("PitchNoteTransition", (float)noteTransitionSlider.getValue(), nullptr);
+        localState.setProperty("PitchNoteTransition", (float)noteTransitionSlider.getValue(), &processor.undoManager);
         };
+    noteTransitionSlider.onDragStart = [this]() {
+        processor.undoManager.beginNewTransaction();
+    };
 
     const float smoothingPercent = (float)localState.getProperty("PitchSmoothing", 1.f);
     smoothingSlider.setRange(0.f, 1.f, 0.05f);
     smoothingSlider.setValue(smoothingPercent, juce::dontSendNotification);
     smoothingSlider.onValueChange = [this]() {
-        localState.setProperty("PitchSmoothing", (float)smoothingSlider.getValue(), nullptr);
+        localState.setProperty("PitchSmoothing", (float)smoothingSlider.getValue(), &processor.undoManager);
         };
+    smoothingSlider.onDragStart = [this]() {
+        processor.undoManager.beginNewTransaction();
+    };
 
     const float waverCents = (float)localState.getProperty("PitchWaver", 0.f);
     waverSlider.setRange(0.f, 20.f, 1.f);
     waverSlider.setValue(waverCents, juce::dontSendNotification);
     waverSlider.onValueChange = [this]() {
-        localState.setProperty("PitchWaver", (float)waverSlider.getValue(), nullptr);
+        localState.setProperty("PitchWaver", (float)waverSlider.getValue(), &processor.undoManager);
         };
+    waverSlider.onDragStart = [this]() {
+        processor.undoManager.beginNewTransaction();
+    };
 
     localState.addListener(this);
 }

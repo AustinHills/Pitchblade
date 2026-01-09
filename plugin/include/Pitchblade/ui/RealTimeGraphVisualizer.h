@@ -64,6 +64,9 @@ private:
     //Number of y axis labels to draw
     int numYAxisLabels = 4;
 
+    //Padding for data points to maintain consistent scroll speed
+    int pointsPerPush = 1;
+
     //Value tree state
     juce::AudioProcessorValueTreeState& apvts;
 public:

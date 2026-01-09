@@ -22,10 +22,27 @@ protected:
     void SetUp() override {
         plugin = std::make_unique<AudioPluginAudioProcessor>();
         plugin->prepareToPlay(sampleRate, samplesPerBlock);
-        plugin->loadDefaultPreset("default");
+        
+        // Ensure we start with a clean slate
+        plugin->clearAllNodes();
 
         buffer.setSize(2, samplesPerBlock);
         buffer.clear();
+    }
+
+    // NEW Helper: Add a single node to the chain via APVTS
+    void addNodeToChain(const juce::String& type, const juce::String& name) {
+        auto chain = plugin->apvts.state.getChildWithName("Chain");
+        
+        juce::ValueTree newNode(type);
+        newNode.setProperty("name", name, nullptr);
+        newNode.setProperty("uuid", juce::Uuid().toString(), nullptr);
+        
+        // This triggers the listener in PluginProcessor, which calls syncChainFromState()
+        chain.addChild(newNode, -1, &plugin->undoManager);
+        
+        // Force synchronous update just in case listener is async (it shouldn't be for standard ValueTree, but safe)
+        plugin->syncChainFromState();
     }
 
     // Helper: Find node by type string
@@ -100,10 +117,9 @@ protected:
 //Test for TC-76
 TEST_F(IntegrationAmplitudeTest, GainNode_ApplyPositiveGain)
 {
+    addNodeToChain("GainNode", "Gain");
     auto gainNode = getNodeByType("GainNode");
-
-    std::vector<AudioPluginAudioProcessor::Row> layout = { {"Gain", ""} };
-    plugin->requestLayout(layout);
+    ASSERT_NE(gainNode, nullptr); // Ensure node was created
 
     setNodeProperty(gainNode, "Gain", juce::Decibels::gainToDecibels(2.0f));
 
@@ -115,10 +131,9 @@ TEST_F(IntegrationAmplitudeTest, GainNode_ApplyPositiveGain)
 //Test for TC-77
 TEST_F(IntegrationAmplitudeTest, NoiseGateNode_SignalBelowThreshold)
 {
+    addNodeToChain("NoiseGateNode", "Noise Gate");
     auto gateNode = getNodeByType("NoiseGateNode");
-
-    std::vector<AudioPluginAudioProcessor::Row> layout = { {"Noise Gate", ""} };
-    plugin->requestLayout(layout);
+    ASSERT_NE(gateNode, nullptr);
 
     setNodeProperty(gateNode, "GateThreshold", -10.0f);
     setNodeProperty(gateNode, "GateAttack", 10.0f);
@@ -132,10 +147,9 @@ TEST_F(IntegrationAmplitudeTest, NoiseGateNode_SignalBelowThreshold)
 //Test for TC-78
 TEST_F(IntegrationAmplitudeTest, NoiseGateNode_SignalAboveThreshold)
 {
+    addNodeToChain("NoiseGateNode", "Noise Gate");
     auto gateNode = getNodeByType("NoiseGateNode");
-
-    std::vector<AudioPluginAudioProcessor::Row> layout = { {"Noise Gate", ""} };
-    plugin->requestLayout(layout);
+    ASSERT_NE(gateNode, nullptr);
 
     setNodeProperty(gateNode, "GateThreshold", -10.0f);
     setNodeProperty(gateNode, "GateAttack", 10.0f);
@@ -149,10 +163,9 @@ TEST_F(IntegrationAmplitudeTest, NoiseGateNode_SignalAboveThreshold)
 //Test for TC-79
 TEST_F(IntegrationAmplitudeTest, CompressorNode_SignalBelowThreshold)
 {
+    addNodeToChain("CompressorNode", "Compressor");
     auto compNode = getNodeByType("CompressorNode");
-
-    std::vector<AudioPluginAudioProcessor::Row> layout = { {"Compressor", ""} };
-    plugin->requestLayout(layout);
+    ASSERT_NE(compNode, nullptr);
 
     setNodeProperty(compNode, "CompThreshold", -30.0f);
     setNodeProperty(compNode, "CompRatio", 4.0f);
@@ -167,10 +180,9 @@ TEST_F(IntegrationAmplitudeTest, CompressorNode_SignalBelowThreshold)
 //Test for TC-80
 TEST_F(IntegrationAmplitudeTest, CompressorNode_SignalAboveThreshold)
 {
+    addNodeToChain("CompressorNode", "Compressor");
     auto compNode = getNodeByType("CompressorNode");
-
-    std::vector<AudioPluginAudioProcessor::Row> layout = { {"Compressor", ""} };
-    plugin->requestLayout(layout);
+    ASSERT_NE(compNode, nullptr);
 
     setNodeProperty(compNode, "CompThreshold", -20.0f);
     setNodeProperty(compNode, "CompRatio", 4.0f);
@@ -185,10 +197,9 @@ TEST_F(IntegrationAmplitudeTest, CompressorNode_SignalAboveThreshold)
 //Test for TC-81
 TEST_F(IntegrationAmplitudeTest, CompressorNode_LimiterMode)
 {
+    addNodeToChain("CompressorNode", "Compressor");
     auto compNode = getNodeByType("CompressorNode");
-
-    std::vector<AudioPluginAudioProcessor::Row> layout = { {"Compressor", ""} };
-    plugin->requestLayout(layout);
+    ASSERT_NE(compNode, nullptr);
 
     setNodeProperty(compNode, "CompThreshold", -40.0f);
     setNodeProperty(compNode, "CompRatio", 2.0f);
@@ -202,10 +213,9 @@ TEST_F(IntegrationAmplitudeTest, CompressorNode_LimiterMode)
 //Test for TC-82
 TEST_F(IntegrationAmplitudeTest, DeEsserNode_SignalInsideFrequencyAndAboveThreshold)
 {
+    addNodeToChain("DeEsserNode", "De-Esser");
     auto deesserNode = getNodeByType("DeEsserNode");
-
-    std::vector<AudioPluginAudioProcessor::Row> layout = { {"De-Esser", ""} };
-    plugin->requestLayout(layout);
+    ASSERT_NE(deesserNode, nullptr);
 
     setNodeProperty(deesserNode, "DeEsserThreshold", -20.0f);
     setNodeProperty(deesserNode, "DeEsserRatio", 4.0f);
@@ -221,10 +231,9 @@ TEST_F(IntegrationAmplitudeTest, DeEsserNode_SignalInsideFrequencyAndAboveThresh
 //Test for TC-83
 TEST_F(IntegrationAmplitudeTest, DeEsserNode_SignalOutsideFrequencyAndAboveThreshold)
 {
+    addNodeToChain("DeEsserNode", "De-Esser");
     auto deesserNode = getNodeByType("DeEsserNode");
-
-    std::vector<AudioPluginAudioProcessor::Row> layout = { {"De-Esser", ""} };
-    plugin->requestLayout(layout);
+    ASSERT_NE(deesserNode, nullptr);
 
     setNodeProperty(deesserNode, "DeEsserThreshold", -20.0f);
     setNodeProperty(deesserNode, "DeEsserRatio", 2.0f);
@@ -240,10 +249,9 @@ TEST_F(IntegrationAmplitudeTest, DeEsserNode_SignalOutsideFrequencyAndAboveThres
 //Test for TC-84
 TEST_F(IntegrationAmplitudeTest, DeEsserNode_SignalInsideFrequencyAndBelowThreshold)
 {
+    addNodeToChain("DeEsserNode", "De-Esser");
     auto deesserNode = getNodeByType("DeEsserNode");
-
-    std::vector<AudioPluginAudioProcessor::Row> layout = { {"De-Esser", ""} };
-    plugin->requestLayout(layout);
+    ASSERT_NE(deesserNode, nullptr);
 
     setNodeProperty(deesserNode, "DeEsserThreshold", -20.0f);
     setNodeProperty(deesserNode, "DeEsserRatio", 2.0f);
@@ -259,10 +267,9 @@ TEST_F(IntegrationAmplitudeTest, DeEsserNode_SignalInsideFrequencyAndBelowThresh
 //Test for TC-85
 TEST_F(IntegrationAmplitudeTest, DeNoiserNode_LearnAndReduce)
 {
+    addNodeToChain("DeNoiserNode", "De-Noiser");
     auto denoiserNode = getNodeByType("DeNoiserNode");
-
-    std::vector<AudioPluginAudioProcessor::Row> layout = { {"De-Noiser", ""} };
-    plugin->requestLayout(layout);
+    ASSERT_NE(denoiserNode, nullptr);
 
     setNodeProperty(denoiserNode, "DenoiserLearn", true); 
     simulateSineSignal(buffer, 500.0f, 1000.0f, juce::Decibels::decibelsToGain(-40.0f));
