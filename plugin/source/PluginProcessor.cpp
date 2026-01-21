@@ -170,7 +170,7 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
 
     // Initialize Monitor Device Manager (if Standalone) - scans for devices
     if (juce::JUCEApplication::isStandaloneApp()) {
-        monitorDeviceManager.initialise(0, 2, nullptr, true);
+        monitorDeviceManager.initialise(0, 2, nullptr, false);
         monitorDeviceManager.addAudioCallback(&monitorCallback);
     }
 }
@@ -311,6 +311,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::c
     params.push_back(std::make_unique<juce::AudioParameterBool>(
         "GLOBAL_CHECK_UPDATES", "Check for Updates", true));
 
+    // Monitor Volume
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "GLOBAL_MONITOR_VOLUME", "Monitor Volume", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 1.0f));
+
     return { params.begin(), params.end() };
 }
 
@@ -343,12 +347,22 @@ void AudioPluginAudioProcessor::loadPresetFromFile(const juce::File& file) {
     // Capture current global settings (Normalized 0..1)
     float storedTheme = 0.0f;
     float storedFramerate = 0.0f;
+    float storedMonitorVol = 1.0f;
+    juce::String storedMonitorDevice;
     
     auto* themeParam = apvts.getParameter("GLOBAL_THEME");
     auto* fpsParam   = apvts.getParameter("GLOBAL_FRAMERATE");
+    auto* monVolParam = apvts.getParameter("GLOBAL_MONITOR_VOLUME");
 
     if (themeParam) storedTheme = themeParam->getValue();
     if (fpsParam)   storedFramerate = fpsParam->getValue();
+    if (monVolParam) storedMonitorVol = monVolParam->getValue();
+    
+    // Capture Monitor Device Name from Property (or fallback to real manager)
+    storedMonitorDevice = apvts.state.getProperty("MonitorDevice").toString();
+    // Safety: If property is empty but we have a running device, perform a "late bind"
+    if (storedMonitorDevice.isEmpty() && monitorDeviceManager.getCurrentAudioDevice())
+         storedMonitorDevice = monitorDeviceManager.getCurrentAudioDevice()->getName();
 
     std::unique_ptr<juce::XmlElement> xml(juce::XmlDocument::parse(file));
     if (!xml) return;
@@ -377,6 +391,12 @@ void AudioPluginAudioProcessor::loadPresetFromFile(const juce::File& file) {
             // This ensures the parameter value is forcefully set to the stored value
             if (themeParam) themeParam->setValueNotifyingHost(storedTheme);
             if (fpsParam)   fpsParam->setValueNotifyingHost(storedFramerate);
+            if (monVolParam) monVolParam->setValueNotifyingHost(storedMonitorVol);
+            
+            // Restore Monitor Device
+            // Note: apvts.replaceState() might trigger listeners, but we enforce the stored device preference
+            // We UNCONDITIONALLY restore, so if it was "None" (empty) it stays "None"
+             apvts.state.setProperty("MonitorDevice", storedMonitorDevice, nullptr);
 
             // Ensure Chain child exists
             if (!apvts.state.getChildWithName("Chain").isValid())
@@ -572,7 +592,10 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, 
         // 1. Get Mixed Stereo Signal (taking main L/R)
         // We assume Main Output is channels 0 and 1.
         if (buffer.getNumChannels() >= 2) {
-            float rawVol = monitorVolume.load();
+            float rawVol = 1.0f;
+            if (auto* p = apvts.getParameter("GLOBAL_MONITOR_VOLUME"))
+                rawVol = p->getValue();
+            
             float vol = rawVol * rawVol; // Quadratic taper for balanced feels
             int numSamples = buffer.getNumSamples();
 
@@ -636,6 +659,13 @@ void AudioPluginAudioProcessor::setStateInformation (const void* data, int sizeI
             
             // Force sync to ensure effectNodes match the loaded state
             syncChainFromState();
+            
+            // Restore Monitor Device (Standalone Only)
+            if (juce::JUCEApplication::isStandaloneApp()) {
+                juce::String dev = apvts.state.getProperty("MonitorDevice");
+                // Restore even if empty (Force "None")
+                setMonitorDevice(dev);
+            }
         }
     }
 }
@@ -867,6 +897,15 @@ void AudioPluginAudioProcessor::valueTreePropertyChanged(juce::ValueTree& tree, 
         syncChainFromState();
         triggerUIRebuild();
     }
+    else if (property.toString() == "MonitorDevice") {
+        // Handle Monitor Device Change from State (e.g. preset restore)
+        // We call setMonitorDevice, which handles deduplication
+        // Run on Message Thread to be safe, although this callback is usually sync
+        juce::String dev = tree.getProperty(property);
+        juce::MessageManager::callAsync([this, dev]() {
+             setMonitorDevice(dev);
+        });
+    }
 }
 
 
@@ -928,8 +967,16 @@ void AudioPluginAudioProcessor::MonitorOutputCallback::audioDeviceIOCallbackWith
 }
 
 void AudioPluginAudioProcessor::setMonitorDevice(const juce::String& deviceName) {
+    // Update State Property to ensure it is saved
+    // We do this FIRST so it persists even if init fails or is empty
+    if (apvts.state.getProperty("MonitorDevice").toString() != deviceName) {
+        apvts.state.setProperty("MonitorDevice", deviceName, nullptr);
+    }
+
     if (deviceName.isEmpty()) {
         monitorDeviceManager.closeAudioDevice();
+        // reset fifo just in case
+        monitorFifo.reset();
         return;
     }
 
@@ -952,7 +999,6 @@ void AudioPluginAudioProcessor::setMonitorDevice(const juce::String& deviceName)
     // initialise(numInputChannelsNeeded, numOutputChannelsNeeded, savedStateXml, selectDefaultDeviceOnFailure, preferredDefaultDeviceName, preferredSetupOptions)
     // We use setAudioDeviceSetup which is cleaner for switching
     
-    // monitorDeviceManager.setAudioDeviceSetup(setup, true);
     juce::String err = monitorDeviceManager.setAudioDeviceSetup(setup, true);
     
     // reset fifo just in case

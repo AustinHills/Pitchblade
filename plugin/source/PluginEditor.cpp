@@ -309,6 +309,9 @@ void AudioPluginAudioProcessorEditor::rebuildAndSyncUI() {
     visualizer.refreshTabs();         
     resized();                        
     repaint();
+    
+    // Ensure monitor selection matches state (Standalone)
+    settingsPanel.syncMonitorSelection();
 
     // Reconnect buttons
     for (int i = 0; i < daisyChain.items.size(); ++i) {
@@ -677,8 +680,6 @@ void AudioPluginAudioProcessorEditor::closeOverlaysIfOpen() {
         daisyChain.repaint();
     }
 
-    //daisyChain.setChainControlsEnabled(true);
-    //daisyChain.setReorderLocked(false);
     visualizer.setVisible(true);
     effectPanel.setVisible(true);
 
