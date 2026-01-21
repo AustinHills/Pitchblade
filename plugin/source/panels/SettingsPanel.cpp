@@ -80,10 +80,24 @@ SettingsPanel::SettingsPanel(AudioPluginAudioProcessor& p) : processor(p) {
             auto devices = type->getDeviceNames(); 
             for (const auto& deviceName : devices) {
                 // Skip if it looks like an input-only device? 
-                // device names are just strings. 
-                monitorDeviceSelector.addItem(deviceName + " (" + type->getTypeName() + ")", itemId++);
+                // device names are just strings.
+                
+                juce::String label = deviceName + " (" + type->getTypeName() + ")";
+                monitorDeviceSelector.addItem(label, itemId);
+
+                // Check if this is the currently active device
+                auto* currentDevice = processor.monitorDeviceManager.getCurrentAudioDevice();
+                if (currentDevice && currentDevice->getName() == deviceName && currentDevice->getTypeName() == type->getTypeName()) {
+                    monitorDeviceSelector.setSelectedId(itemId, juce::dontSendNotification);
+                }
+                
+                itemId++;
             }
         }
+        
+        // If nothing selected (and not "None"), default to None?
+        if (monitorDeviceSelector.getSelectedId() == 0)
+             monitorDeviceSelector.setSelectedId(1, juce::dontSendNotification);
         
         // Restore selection if possible (would need saved state, skipping for now)
         monitorDeviceSelector.onChange = [this] {
@@ -117,12 +131,10 @@ SettingsPanel::SettingsPanel(AudioPluginAudioProcessor& p) : processor(p) {
         addAndMakeVisible(monitorGainSlider);
         monitorGainSlider.setSliderStyle(juce::Slider::LinearHorizontal);
         monitorGainSlider.setTextBoxStyle(juce::Slider::TextBoxLeft, false, 50, 20);
-        monitorGainSlider.setRange(0.0, 1.0, 0.01);
-        monitorGainSlider.setValue(processor.monitorVolume.load());
         
-        monitorGainSlider.onValueChange = [this] {
-            processor.monitorVolume.store((float)monitorGainSlider.getValue());
-        };
+        // Attach to Parameter
+        monitorGainAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+            processor.apvts, "GLOBAL_MONITOR_VOLUME", monitorGainSlider);
     }
 
     //License stuff
@@ -250,4 +262,29 @@ void SettingsPanel::refreshColors() {
     }
 
     repaint();
+}
+
+void SettingsPanel::syncMonitorSelection() {
+    if (!juce::JUCEApplication::isStandaloneApp()) return;
+
+    auto* currentDevice = processor.monitorDeviceManager.getCurrentAudioDevice();
+    if (!currentDevice) {
+         return;
+    }
+    
+    juce::String currentName = currentDevice->getName();
+    juce::String currentType = currentDevice->getTypeName();
+
+    for (int i = 0; i < monitorDeviceSelector.getNumItems(); ++i) {
+        // Item IDs start at 1
+        int id = monitorDeviceSelector.getItemId(i);
+        juce::String text = monitorDeviceSelector.getItemText(i);
+        
+        // Item text format is "Name (Type)"
+        // Check if the current device name matches the start of the item text
+        if (text.startsWith(currentName)) {
+             monitorDeviceSelector.setSelectedId(id, juce::dontSendNotification);
+             return;
+        }
+    }
 }

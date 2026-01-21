@@ -42,6 +42,7 @@ private:
     juce::ComboBox monitorDeviceSelector;
     juce::Label monitorGainLabel;
     juce::Slider monitorGainSlider;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> monitorGainAttachment;
 
     //TextEditor to hold the license info
     juce::TextEditor licenseText;
@@ -57,4 +58,5 @@ public:
     void paint(juce::Graphics& g) override;
     void resized() override;
     void refreshColors();
+    void syncMonitorSelection();
 };

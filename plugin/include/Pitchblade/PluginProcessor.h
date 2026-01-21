@@ -215,7 +215,7 @@ public:
     juce::AbstractFifo monitorFifo { 48000 }; // 1 second buffer approx
     juce::AudioBuffer<float> monitorBuffer;
     
-    std::atomic<float> monitorVolume { 1.0f };
+
 
     // Method to set the monitor device by name
     void setMonitorDevice(const juce::String& deviceName);
